@@ -3,7 +3,8 @@
 
 ## Team Members
 
-- Student 1
-- Student 2
-- Student 3
-- Student 4
+- Brenden Lapuz
+- Ashley Ching
+- Andrew Lee
+- Kim Phung Nguyen
+

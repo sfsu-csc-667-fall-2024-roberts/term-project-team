@@ -1,0 +1,27 @@
+{
+  "name": "term-project-team",
+  "version": "1.0.0",
+  "description": "Monopoly game project",
+  "main": "src/server/index.ts",
+  "scripts": {
+    "dev": "nodemon src/server/index.ts",
+    "start": "ts-node src/server/index.ts",
+    "build": "tsc",
+    "start:dev": "nodemon --exec ts-node src/server/index.ts",
+    "prepare": "husky install"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^5.0.1",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.8.1",
+    "husky": "^8.0.0",
+    "nodemon": "^3.1.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}

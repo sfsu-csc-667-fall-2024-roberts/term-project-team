@@ -5,6 +5,7 @@
 
 - Brenden Lapuz
 - Ashley Ching
-- Andrew Lee
 - Kim Phung Nguyen
+- Andrew Lee
+
 

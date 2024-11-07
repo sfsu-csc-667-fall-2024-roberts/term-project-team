@@ -6,6 +6,8 @@ import path from "path";
 import morgan from "morgan";
 const app = express();
 const PORT = process.env.PORT || 3000;
+import connectLiveReload from "connect-livereload";
+import livereload from "livereload";
 
 app.use(timeMiddleware);
 
@@ -30,3 +32,14 @@ app.use(express.static(path.join(process.cwd(), "src", "public")));
 app.set( "views", path.join(process.cwd(), "src", "server", "views"));
 app.set("view engine", "ejs");
 app.use("/", rootRoutes);
+const staticPath = path.join(process.cwd(), "src", "public");
+app.use(express.static(staticPath));
+if (process.env.NODE_ENV === "development") {
+  const reloadServer = livereload.createServer();
+  reloadServer.watch(staticPath);
+  reloadServer.server.once("connection", () => {
+    setTimeout(() => {
+      reloadServer.refresh("/");
+}, 100); });
+  app.use(connectLiveReload());
+}

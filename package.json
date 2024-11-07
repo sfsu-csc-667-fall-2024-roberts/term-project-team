@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "nodemon src/server/index.ts",
     "start": "ts-node src/server/index.ts",
-    "build": "tsc",
-    "start:dev": "nodemon --exec ts-node src/server/index.ts",
+    "build": "webpack build",
+    "build:dev": "webpack build --mode development --watch",
+    "start:dev": "concurrently --names server,frontend -c blue,green \"npm run server:dev\" \"npm run build:dev\"",
+    "server:dev": "nodemon --exec ts-node src/server/index.ts --ext js,css,ejs --ignore src/public/js",
     "prepare": "husky install"
   },
   "dependencies": {
@@ -16,12 +18,20 @@
     "morgan": "^1.10.0"
   },
   "devDependencies": {
+    "@types/connect-livereload": "^0.6.3",
     "@types/express": "^5.0.0",
+    "@types/livereload": "^0.9.5",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.8.1",
+    "@types/webpack": "^5.28.5",
+    "connect-livereload": "^0.6.1",
     "husky": "^8.0.0",
+    "livereload": "^0.9.3",
     "nodemon": "^3.1.7",
+    "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "webpack": "^5.96.1",
+    "webpack-cli": "^5.1.4"
   }
 }

@@ -4,42 +4,40 @@ import { timeMiddleware } from "./middleware/time";
 import rootRoutes from "./routes/root";
 import path from "path";
 import morgan from "morgan";
-const app = express();
-const PORT = process.env.PORT || 3000;
 import connectLiveReload from "connect-livereload";
 import livereload from "livereload";
 
-app.use(timeMiddleware);
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-/* Rest of server content */
-
-app.get("/", (_req, res) => {
-  res.send("Hello World!");
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-
-app.use((_request, _response, next) => {next(httpErrors(404))})
-
-app.use(express.static(path.join(process.cwd(), "src", "public")));
-
+// Middleware
 app.use(morgan("dev"));
+app.use(timeMiddleware);
+app.use(express.static(path.join(process.cwd(), "src", "public")));
+
+// View engine setup
+app.set("views", path.join(process.cwd(), "src", "server", "views"));
+app.set("view engine", "ejs");
+
+// Routes
 app.use("/", rootRoutes);
 
-app.use(express.static(path.join(process.cwd(), "src", "public")));
-app.set( "views", path.join(process.cwd(), "src", "server", "views"));
-app.set("view engine", "ejs");
-app.use("/", rootRoutes);
-const staticPath = path.join(process.cwd(), "src", "public");
-app.use(express.static(staticPath));
+// 404 handler
+app.use((_request, _response, next) => {next(httpErrors(404))});
+
+// Live reload in development
 if (process.env.NODE_ENV === "development") {
+  const staticPath = path.join(process.cwd(), "src", "public");
   const reloadServer = livereload.createServer();
   reloadServer.watch(staticPath);
   reloadServer.server.once("connection", () => {
     setTimeout(() => {
       reloadServer.refresh("/");
-}, 100); });
+    }, 100);
+  });
   app.use(connectLiveReload());
 }
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});

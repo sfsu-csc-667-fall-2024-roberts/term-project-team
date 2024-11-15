@@ -1,11 +1,15 @@
+import dotenv from "dotenv";
 import express from "express";
 import httpErrors from "http-errors";
 import { timeMiddleware } from "./middleware/time";
-import rootRoutes from "./routes/root";
 import path from "path";
 import morgan from "morgan";
 import connectLiveReload from "connect-livereload";
 import livereload from "livereload";
+
+dotenv.config();
+
+import rootRoutes from "./routes/root";
 
 const app = express();
 const PORT = process.env.PORT || 3000;

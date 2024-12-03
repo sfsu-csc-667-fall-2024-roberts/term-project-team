@@ -7,7 +7,6 @@ import morgan from "morgan";
 
 dotenv.config();
 
-import liveReloadConfig from "./config/livereload";
 
 //Cannot find module "./folder" when trying to import the entire folder like in the lectures.
 //Error only goes away when importing a specific file. I assume we need to import the manifest files?
@@ -21,11 +20,12 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(morgan("dev"));
 app.use(timeMiddleware);
-app.use(express.static(path.join(process.cwd(), "src", "public")));
+app.use(express.json()); // Parse JSON payloads
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded payloads
 
-//staticPath
-const staticPath = path.join(process.cwd (), "src", "public");
-app.use(express.static (staticPath));
+// LiveReload (See 11/4, 13:45)
+const staticPath = path.join(process.cwd(), "src", "public");
+app.use(express.static(staticPath));
 
 // LiveReload (See 11/4, 13:45)
 configuration.configureLiveReload(app, staticPath);
@@ -40,9 +40,7 @@ app.use("/", routes.root);
 app.use("/tests", routes.tests);
 
 // 404 handler
-app.use((_request, _response, next) => {next(httpErrors(404))});
-
-
+app.use((_request, _response, next) => next(httpErrors(404)));
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

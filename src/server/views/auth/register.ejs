@@ -1,0 +1,38 @@
+!doctype html>
+<html lang="en">
+  <%- include('../partials/head') %>
+  <body>
+    <%- include('../partials/menu') %>
+    <section>
+      <form method="post" action="/auth/register">
+        <div>
+          <label for="username">Username</label>
+          <input
+            type="username"
+            id="username"
+            name="username"
+            placeholder="Choose your username"
+            required
+          />
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="you@domain.com"
+            required
+          />
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required />
+        </div>
+        <div>
+          <button type="submit">Register</button>
+        </div>
+      </form>
+    </section>
+  </body>
+</html>

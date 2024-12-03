@@ -13,6 +13,7 @@
     "prepare": "husky install"
   },
   "dependencies": {
+    "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
@@ -21,6 +22,7 @@
     "morgan": "^1.10.0"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/connect-livereload": "^0.6.3",
     "@types/express": "^5.0.0",
     "@types/livereload": "^0.9.5",

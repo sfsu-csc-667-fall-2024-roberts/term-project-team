@@ -45,4 +45,10 @@ router.post("/login", async (request, response) => {
   }
 });
 
+router.get("/logout", (request, response) => {
+request.session.destroy(() => {
+response.redirect("/");
+  });
+});
+
 export default router;

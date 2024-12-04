@@ -10,8 +10,9 @@ dotenv.config();
 
 //Cannot find module "./folder" when trying to import the entire folder like in the lectures.
 //Error only goes away when importing a specific file. I assume we need to import the manifest files?
-import * as configuration from "./config/manifestlivereload";
-import * as routes from "./routes/manifestroutes";
+import * as configuration from "./config";
+import * as routes from "./routes";
+import * as middleware from "./middleware";
 //import rootRoutes from "./routes/root";
 
 const app = express();
@@ -29,7 +30,7 @@ app.use(express.static(staticPath));
 
 // LiveReload (See 11/4, 13:45)
 configuration.configureLiveReload(app, staticPath);
-
+configuration.configureSession(app);
 // View engine setup
 app.set("views", path.join(process.cwd(), "src", "server", "views"));
 app.set("view engine", "ejs");

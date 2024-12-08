@@ -1,0 +1,73 @@
+<%- include('partials/header') %>
+
+<div class="game-container">
+  <div class="game-header">
+    <h1>Game #<%= game.id %></h1>
+    <div class="game-status">Status: <%= game.status %></div>
+  </div>
+
+  <div class="game-content">
+    <div class="players-section">
+      <h2>Players</h2>
+      <div class="players-list">
+        <% players.forEach(player => { %>
+          <div class="player-card <%= player.user_id === currentUserId ? 'current-player' : '' %>">
+            <div class="player-info">
+              <h3><%= player.username %></h3>
+              <p>Balance: $<%= player.balance %></p>
+              <p>Position: <%= player.position %></p>
+              <% if (player.jailed) { %>
+                <p class="jailed-status">In Jail</p>
+              <% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <div class="game-board">
+      <div id="monopoly-board"></div>
+    </div>
+
+    <div class="properties-section">
+      <h2>Properties</h2>
+      <div class="properties-list">
+        <% properties.forEach(property => { %>
+          <div class="property-card">
+            <div class="property-info">
+              <h3><%= property.name %></h3>
+              <% if (property.owner_id) { %>
+                <p>Owner: <%= players.find(p => p.user_id === property.owner_id)?.username || 'Unknown' %></p>
+              <% } else { %>
+                <p>Unowned</p>
+              <% } %>
+              <% if (property.house_count > 0) { %>
+                <p>Houses: <%= property.house_count %></p>
+              <% } %>
+              <% if (property.mortgaged) { %>
+                <p class="mortgaged-status">Mortgaged</p>
+              <% } %>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  </div>
+
+  <div class="game-controls">
+    <button id="roll-dice" class="btn btn-primary">Roll Dice</button>
+    <button id="end-turn" class="btn btn-secondary">End Turn</button>
+  </div>
+</div>
+
+<script>
+  // Pass game data to the client
+  window.gameData = {
+    players: <%- JSON.stringify(players) %>,
+    currentUserId: <%= currentUserId %>
+  };
+</script>
+
+<script src="/dist/game.bundle.js"></script>
+
+<%- include('partials/footer') %> 

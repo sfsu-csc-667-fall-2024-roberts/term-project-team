@@ -1,0 +1,210 @@
+/* Game board container */
+#monopoly-board {
+  width: 660px;
+  height: 660px;
+  background: #C5FFC5;
+  position: relative;
+  margin: 0 auto;
+  box-sizing: border-box;
+  border: 1px solid #000;
+}
+
+/* Board spaces */
+.board-space {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  background: #fff;
+  border: 1px solid #000;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Space content wrapper */
+.space-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px;
+  font-size: 0.6rem;
+  text-align: center;
+}
+
+/* Property color bars */
+.property-color-bar {
+  width: 100%;
+  height: 12px;
+  margin-bottom: 3px;
+  flex-shrink: 0;
+}
+
+/* Property info */
+.property-info {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: calc(100% - 15px); /* Height minus color bar and margins */
+  padding: 0 2px;
+}
+
+/* Property name and price */
+.property-name {
+  flex: 1;
+  font-weight: bold;
+  font-size: 0.45rem;
+  line-height: 1.1;
+  margin: 0;
+  padding: 2px 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  min-height: 0;
+}
+
+.property-price {
+  font-size: 0.5rem;
+  line-height: 1;
+  padding: 2px 0;
+  margin-top: auto;
+  width: 100%;
+  text-align: center;
+}
+
+/* Special spaces (no color bar) */
+.space-railroad .property-info,
+.space-utility .property-info,
+.space-tax .property-info,
+.space-chance .property-info,
+.space-chest .property-info {
+  height: 100%;
+  padding-top: 4px;
+  justify-content: space-between;
+}
+
+/* Special spaces background colors */
+.space-railroad,
+.space-utility,
+.space-tax,
+.space-chance,
+.space-chest {
+  background-color: #f0f0f0;
+}
+
+/* Side-specific rotations */
+.bottom-row .space-content {
+  transform: none;
+}
+
+.left-column .space-content {
+  transform: rotate(-90deg);
+}
+
+.top-row .space-content {
+  transform: rotate(-180deg);
+}
+
+.right-column .space-content {
+  transform: rotate(90deg);
+}
+
+/* Corner spaces */
+.corner {
+  width: 60px;
+  height: 60px;
+}
+
+.corner .space-content {
+  transform: none !important;
+  padding: 4px;
+  font-size: 0.65rem;
+  font-weight: bold;
+  justify-content: center;
+}
+
+/* Corner colors */
+.space-corner.bottom-right { background-color: #28a745; color: white; } /* GO */
+.space-corner.bottom-left { background-color: #dc3545; color: white; }  /* Jail */
+.space-corner.top-left { background-color: #ffc107; color: black; }     /* Free Parking */
+.space-corner.top-right { background-color: #17a2b8; color: white; }    /* Go to Jail */
+
+/* Property colors */
+.color-brown { background-color: #955436; }
+.color-light-blue { background-color: #AAE0FA; }
+.color-pink { background-color: #D93A96; }
+.color-orange { background-color: #F7941D; }
+.color-red { background-color: #ED1B24; }
+.color-yellow { background-color: #FEF200; }
+.color-green { background-color: #1FB25A; }
+.color-blue { background-color: #0072BB; }
+
+/* Position classes */
+/* Bottom row */
+.pos-0 { right: 0; bottom: 0; }
+.pos-1 { right: 60px; bottom: 0; }
+.pos-2 { right: 120px; bottom: 0; }
+.pos-3 { right: 180px; bottom: 0; }
+.pos-4 { right: 240px; bottom: 0; }
+.pos-5 { right: 300px; bottom: 0; }
+.pos-6 { right: 360px; bottom: 0; }
+.pos-7 { right: 420px; bottom: 0; }
+.pos-8 { right: 480px; bottom: 0; }
+.pos-9 { right: 540px; bottom: 0; }
+.pos-10 { left: 0; bottom: 0; }
+
+/* Left column */
+.pos-11 { left: 0; bottom: 60px; }
+.pos-12 { left: 0; bottom: 120px; }
+.pos-13 { left: 0; bottom: 180px; }
+.pos-14 { left: 0; bottom: 240px; }
+.pos-15 { left: 0; bottom: 300px; }
+.pos-16 { left: 0; bottom: 360px; }
+.pos-17 { left: 0; bottom: 420px; }
+.pos-18 { left: 0; bottom: 480px; }
+.pos-19 { left: 0; bottom: 540px; }
+.pos-20 { left: 0; top: 0; }
+
+/* Top row */
+.pos-21 { left: 60px; top: 0; }
+.pos-22 { left: 120px; top: 0; }
+.pos-23 { left: 180px; top: 0; }
+.pos-24 { left: 240px; top: 0; }
+.pos-25 { left: 300px; top: 0; }
+.pos-26 { left: 360px; top: 0; }
+.pos-27 { left: 420px; top: 0; }
+.pos-28 { left: 480px; top: 0; }
+.pos-29 { left: 540px; top: 0; }
+.pos-30 { right: 0; top: 0; }
+
+/* Right column */
+.pos-31 { right: 0; top: 60px; }
+.pos-32 { right: 0; top: 120px; }
+.pos-33 { right: 0; top: 180px; }
+.pos-34 { right: 0; top: 240px; }
+.pos-35 { right: 0; top: 300px; }
+.pos-36 { right: 0; top: 360px; }
+.pos-37 { right: 0; top: 420px; }
+.pos-38 { right: 0; top: 480px; }
+.pos-39 { right: 0; top: 540px; }
+
+/* Player tokens */
+.player-token {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  border: 1px solid #000;
+  transition: all 0.3s ease;
+}
+
+/* Hover effect */
+.board-space:hover {
+  z-index: 2;
+  box-shadow: 0 0 5px rgba(0,0,0,0.2);
+}
+ 

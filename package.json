@@ -10,7 +10,10 @@
     "build:dev": "webpack build --mode development --watch",
     "start:dev": "concurrently --names server,frontend -c blue,green \"npm run server:dev\" \"npm run build:dev\"",
     "server:dev": "nodemon --exec ts-node src/server/index.ts --ext ts,js,css,ejs --ignore src/public/js",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "migrate": "ts-node src/server/db/migrations/runMigrations.ts",
+    "test:data": "ts-node src/server/scripts/addTestData.ts",
+    "dev:start": "npm run build && npm start"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -22,7 +25,8 @@
     "express-flash": "^0.0.2",
     "express-session": "^1.18.1",
     "http-errors": "^2.0.0",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "pg": "^8.11.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
@@ -34,6 +38,7 @@
     "@types/livereload": "^0.9.5",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.8.1",
+    "@types/pg": "^8.11.0",
     "@types/webpack": "^5.28.5",
     "concurrently": "^9.1.0",
     "connect-livereload": "^0.6.1",

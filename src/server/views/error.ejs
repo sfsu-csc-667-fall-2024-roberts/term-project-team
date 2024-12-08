@@ -1,0 +1,16 @@
+<%- include('partials/header') %>
+
+<div class="error-container">
+  <h1>Error</h1>
+  <% if (message) { %>
+    <p class="error-message"><%= message %></p>
+  <% } %>
+  <% if (error && error.stack && process.env.NODE_ENV === 'development') { %>
+    <pre class="error-stack"><%= error.stack %></pre>
+  <% } %>
+  <div class="error-actions">
+    <a href="/" class="btn btn-primary">Return Home</a>
+  </div>
+</div>
+
+<%- include('partials/footer') %> 

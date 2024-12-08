@@ -1,12 +1,25 @@
 {
   "compilerOptions": {
     "target": "ES6",
-    "module": "ESNext",
-    "outDir": "./public/js",
-    "rootDir": "./public/js",
+    "module": "ES6",
     "strict": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./src/public/dist",
+    "rootDir": "./src",
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"]
+    }
   },
-  "include": ["public/js/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "src/public/js/**/*",
+    "src/shared/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/server/**/*"
+  ]
 }

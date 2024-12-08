@@ -1,53 +1,121 @@
-import express from "express";
-import { Users } from "../db"; 
+import express from 'express';
+import bcrypt from 'bcrypt';
+import { createUser, getUserByUsername } from '../db/services/dbService';
+import { requireNoAuth } from '../middleware/auth';
 
 const router = express.Router();
 
-router.get("/register", (_request, response) => {
-  response.render("auth/register", { title: "Auth: Register" });
+// GET /register - Show registration form
+router.get('/register', requireNoAuth, (_req, res) => {
+  res.render('auth/register', { error: null });
 });
 
-router.get("/login", (_request, response) => {
-  response.render("auth/login", { title: "Auth: Login" }); // Corrected title
-});
-
-router.post("/register", async (request, response) => {
-  const { username, email, password } = request.body;
-
+// POST /register - Handle registration
+router.post('/register', requireNoAuth, async (req, res) => {
   try {
-    const user = await Users.register(username, email, password);
-    // @ts-expect-error: Define session type for the user object
-    request.session.user = user;
+    const { username, password, confirmPassword } = req.body;
 
-    response.redirect("/lobby"); 
+    // Basic validation
+    if (!username || !password || !confirmPassword) {
+      return res.render('auth/register', { 
+        error: 'All fields are required' 
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.render('auth/register', { 
+        error: 'Passwords do not match' 
+      });
+    }
+
+    // Check if username already exists
+    const existingUser = await getUserByUsername(username);
+    if (existingUser) {
+      return res.render('auth/register', { 
+        error: 'Username already taken' 
+      });
+    }
+
+    // Create new user
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await createUser(username, hashedPassword);
+
+    // Log them in automatically
+    req.session.userId = user.id;
+    req.session.user = {
+      id: user.id,
+      username: user.username
+    };
+
+    res.redirect('/lobby');
   } catch (error) {
-    console.error(error);
-
-    request.flash("error", "Failed to register user. Please try again.");
-    response.redirect("/auth/register");
+    console.error('Registration error:', error);
+    res.render('auth/register', { 
+      error: 'An error occurred during registration' 
+    });
   }
 });
 
-router.post("/login", async (request, response) => {
-  const { email, password } = request.body;
+// GET /login - Show login form
+router.get('/login', requireNoAuth, (_req, res) => {
+  res.render('auth/login', { error: null });
+});
 
+// POST /login - Handle login
+router.post('/login', requireNoAuth, async (req, res) => {
   try {
-    const user = await Users.login(email, password);
-    // @ts-expect-error: Define session type for the user object
-    request.session.user = user;
+    const { username, password } = req.body;
 
-    response.redirect("/lobby"); 
+    // Basic validation
+    if (!username || !password) {
+      return res.render('auth/login', { 
+        error: 'Username and password are required' 
+      });
+    }
+
+    // Find user
+    const user = await getUserByUsername(username);
+    if (!user) {
+      return res.render('auth/login', { 
+        error: 'Invalid username or password' 
+      });
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.hashed_password);
+    if (!isValidPassword) {
+      return res.render('auth/login', { 
+        error: 'Invalid username or password' 
+      });
+    }
+
+    // Set session
+    req.session.userId = user.id;
+    req.session.user = {
+      id: user.id,
+      username: user.username
+    };
+
+    // Redirect to original URL or lobby
+    const returnTo = req.session.returnTo || '/lobby';
+    delete req.session.returnTo;
+    res.redirect(returnTo);
+
   } catch (error) {
-    console.error(error);
-
-    request.flash("error", "Invalid email or password.");
-    response.redirect("/auth/login");
+    console.error('Login error:', error);
+    res.render('auth/login', { 
+      error: 'An error occurred during login' 
+    });
   }
 });
 
-router.get("/logout", (request, response) => {
-request.session.destroy(() => {
-response.redirect("/");
+// POST /logout - Handle logout
+router.post('/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Logout error:', err);
+    }
+    res.redirect('/login');
   });
 });
 

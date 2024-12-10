@@ -20,7 +20,7 @@
   overflow: hidden;
 }
 
-/* Space content wrapper */
+/* Space content */
 .space-content {
   width: 100%;
   height: 100%;
@@ -32,104 +32,63 @@
   text-align: center;
 }
 
-/* Property color bars */
-.property-color-bar {
+/* Property spaces */
+.space-property .property-color-bar {
   width: 100%;
   height: 12px;
   margin-bottom: 3px;
-  flex-shrink: 0;
 }
 
-/* Property info */
 .property-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   width: 100%;
-  height: calc(100% - 15px); /* Height minus color bar and margins */
-  padding: 0 2px;
 }
 
-/* Property name and price */
 .property-name {
-  flex: 1;
-  font-weight: bold;
   font-size: 0.45rem;
   line-height: 1.1;
+  font-weight: bold;
   margin: 0;
-  padding: 2px 1px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  width: 100%;
-  min-height: 0;
+  padding: 2px;
 }
 
 .property-price {
   font-size: 0.5rem;
-  line-height: 1;
-  padding: 2px 0;
-  margin-top: auto;
-  width: 100%;
-  text-align: center;
-}
-
-/* Special spaces (no color bar) */
-.space-railroad .property-info,
-.space-utility .property-info,
-.space-tax .property-info,
-.space-chance .property-info,
-.space-chest .property-info {
-  height: 100%;
-  padding-top: 4px;
-  justify-content: space-between;
-}
-
-/* Special spaces background colors */
-.space-railroad,
-.space-utility,
-.space-tax,
-.space-chance,
-.space-chest {
-  background-color: #f0f0f0;
-}
-
-/* Side-specific rotations */
-.bottom-row .space-content {
-  transform: none;
-}
-
-.left-column .space-content {
-  transform: rotate(-90deg);
-}
-
-.top-row .space-content {
-  transform: rotate(-180deg);
-}
-
-.right-column .space-content {
-  transform: rotate(90deg);
+  padding: 2px;
 }
 
 /* Corner spaces */
-.corner {
-  width: 60px;
-  height: 60px;
+.space-corner {
+  background-color: #f0f0f0;
 }
 
-.corner .space-content {
-  transform: none !important;
-  padding: 4px;
-  font-size: 0.65rem;
+.space-corner .space-content {
+  justify-content: center;
   font-weight: bold;
+  font-size: 0.7rem;
+}
+
+/* Special spaces */
+.space-railroad .space-content,
+.space-utility .space-content,
+.space-tax .space-content,
+.space-chance .space-content,
+.space-chest .space-content {
   justify-content: center;
 }
 
-/* Corner colors */
-.space-corner.bottom-right { background-color: #28a745; color: white; } /* GO */
-.space-corner.bottom-left { background-color: #dc3545; color: white; }  /* Jail */
-.space-corner.top-left { background-color: #ffc107; color: black; }     /* Free Parking */
-.space-corner.top-right { background-color: #17a2b8; color: white; }    /* Go to Jail */
+.space-name {
+  font-weight: bold;
+  font-size: 0.6rem;
+  margin-bottom: 4px;
+}
+
+.space-price {
+  font-size: 0.55rem;
+}
 
 /* Property colors */
 .color-brown { background-color: #955436; }
@@ -140,6 +99,12 @@
 .color-yellow { background-color: #FEF200; }
 .color-green { background-color: #1FB25A; }
 .color-blue { background-color: #0072BB; }
+
+/* Side rotations */
+.bottom-row .space-content { transform: none; }
+.left-column .space-content { transform: rotate(-90deg); }
+.top-row .space-content { transform: rotate(-180deg); }
+.right-column .space-content { transform: rotate(90deg); }
 
 /* Position classes */
 /* Bottom row */
@@ -190,6 +155,12 @@
 .pos-38 { right: 0; top: 480px; }
 .pos-39 { right: 0; top: 540px; }
 
+/* Corner colors */
+.space-corner.corner-go { background-color: #28a745; color: white; }
+.space-corner.corner-jail { background-color: #dc3545; color: white; }
+.space-corner.corner-parking { background-color: #ffc107; color: black; }
+.space-corner.corner-gotojail { background-color: #17a2b8; color: white; }
+
 /* Player tokens */
 .player-token {
   width: 12px;
@@ -200,11 +171,5 @@
   z-index: 10;
   border: 1px solid #000;
   transition: all 0.3s ease;
-}
-
-/* Hover effect */
-.board-space:hover {
-  z-index: 2;
-  box-shadow: 0 0 5px rgba(0,0,0,0.2);
 }
  

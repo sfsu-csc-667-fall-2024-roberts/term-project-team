@@ -1,1 +1,1 @@
-export { default as authentication } from "./authentication";
+export { requireAuth, requireNoAuth, addUserToLocals } from "./auth";

@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { createHash } from "crypto";
-import db from "../connection";
+import { pool } from "../config";
 import { REGISTER_SQL, FIND_BY_EMAIL_SQL } from "./sql";
 
 type User = {
@@ -21,7 +21,8 @@ const register = async (
 ): Promise<User> => {
   const password = await bcrypt.hash(clearTextPassword, 10);
   const gravatar = createHash("sha256").update(email).digest("hex");
-  return await db.one(REGISTER_SQL, [username, email, password, gravatar]);
+  const result = await pool.query(REGISTER_SQL, [username, email, password, gravatar]);
+  return result.rows[0];
 };
 
 const login = async (email: string, clearTextPassword: string): Promise<User> => {
@@ -35,8 +36,9 @@ const login = async (email: string, clearTextPassword: string): Promise<User> =>
   }
 };
 
-const findByEmail = (email: string): Promise<UserWithPassword> => {
-  return db.one(FIND_BY_EMAIL_SQL, [email]);
+const findByEmail = async (email: string): Promise<UserWithPassword> => {
+  const result = await pool.query(FIND_BY_EMAIL_SQL, [email]);
+  return result.rows[0];
 };
 
 export default { register, login, findByEmail };

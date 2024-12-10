@@ -7,65 +7,6 @@ export interface BoardSpace {
   rent?: number[];
 }
 
-// Board dimensions (all spaces are uniform 60x60 for simplicity)
-export const BOARD_DIMENSIONS = {
-  SPACE_SIZE: 60,  // All spaces are uniform squares
-  BOARD_SIZE: 660  // 11 spaces per side (including corners) * 60px
-};
-
-// Helper function to calculate position
-export function calculateSpacePosition(position: number): { top: number; left: number } {
-  const { SPACE_SIZE, BOARD_SIZE } = BOARD_DIMENSIONS;
-  const lastSpace = BOARD_SIZE - SPACE_SIZE;
-
-  // Calculate which side of the board we're on and position accordingly
-  if (position === 0) { // GO (bottom right)
-    return { top: lastSpace, left: lastSpace };
-  }
-  
-  if (position <= 9) { // Bottom row (right to left from GO)
-    return {
-      top: lastSpace,
-      left: lastSpace - (position * SPACE_SIZE)
-    };
-  }
-  
-  if (position === 10) { // JAIL (bottom left)
-    return { top: lastSpace, left: 0 };
-  }
-  
-  if (position <= 19) { // Left column (bottom to top)
-    const offset = position - 10;
-    return {
-      top: lastSpace - (offset * SPACE_SIZE),
-      left: 0
-    };
-  }
-  
-  if (position === 20) { // FREE PARKING (top left)
-    return { top: 0, left: 0 };
-  }
-  
-  if (position <= 29) { // Top row (left to right)
-    const offset = position - 20;
-    return {
-      top: 0,
-      left: offset * SPACE_SIZE
-    };
-  }
-  
-  if (position === 30) { // GO TO JAIL (top right)
-    return { top: 0, left: lastSpace };
-  }
-  
-  // Right column (top to bottom)
-  const offset = position - 30;
-  return {
-    top: offset * SPACE_SIZE,
-    left: lastSpace
-  };
-}
-
 export const BOARD_SPACES: BoardSpace[] = [
   // Bottom row (right to left)
   { name: "GO", type: "corner", position: 0 },

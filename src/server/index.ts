@@ -48,7 +48,7 @@ app.use(
 app.use(addUserToLocals);
 
 // Static files
-const staticPath = path.join(process.cwd(), "src", "public");
+const staticPath = path.join(process.cwd(), "public");
 app.use(express.static(staticPath));
 
 // LiveReload setup in development

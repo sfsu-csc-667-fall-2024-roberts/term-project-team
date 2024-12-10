@@ -32,14 +32,17 @@ app.use(
   session({
     store: new PgSession({
       pool,
-      tableName: "session"
+      tableName: "session",
+      createTableIfMissing: true
     }),
     secret: process.env.SESSION_SECRET || "your_session_secret",
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      secure: process.env.NODE_ENV === "production"
+      secure: false, // Set to false for development
+      httpOnly: true,
+      sameSite: 'lax'
     }
   })
 );
@@ -56,14 +59,30 @@ if (process.env.NODE_ENV !== "production") {
   const livereload = require("livereload");
   const connectLivereload = require("connect-livereload");
   
-  const liveReloadServer = livereload.createServer();
+  const liveReloadServer = livereload.createServer({
+    port: 35729,
+    // Add error handler to prevent crash on port conflict
+    errorListener: (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.warn('LiveReload port 35729 is in use, live reload will not be available');
+      } else {
+        console.error('LiveReload error:', err);
+      }
+    }
+  });
   liveReloadServer.watch(staticPath);
   
   // Add CSP headers for development
   app.use((_req, res, next) => {
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:35729; connect-src 'self' ws://localhost:35729;"
+      "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:35729; " +
+      "style-src 'self' 'unsafe-inline' 'unsafe-hashes'; " +
+      "img-src 'self' data: https:; " +
+      "font-src 'self' data:; " +
+      "connect-src 'self' ws://localhost:35729; " +
+      "base-uri 'self';"
     );
     next();
   });

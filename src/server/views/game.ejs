@@ -11,11 +11,12 @@
       <h2>Players</h2>
       <div class="players-list">
         <% players.forEach(player => { %>
-          <div class="player-card <%= player.user_id === currentUserId ? 'current-player' : '' %>">
+          <div class="player-card <%= player.user_id === currentUserId ? 'current-player' : '' %>" 
+               data-player-id="<%= player.user_id %>">
             <div class="player-info">
               <h3><%= player.username %></h3>
-              <p>Balance: $<%= player.balance %></p>
-              <p>Position: <%= player.position %></p>
+              <p class="balance">Balance: $<%= player.balance || 0 %></p>
+              <p class="position">Position: <%= player.position || 0 %></p>
               <% if (player.jailed) { %>
                 <p class="jailed-status">In Jail</p>
               <% } %>
@@ -57,14 +58,21 @@
   <div class="game-controls">
     <button id="roll-dice" class="btn btn-primary">Roll Dice</button>
     <button id="end-turn" class="btn btn-secondary">End Turn</button>
+    <button id="reset-balance" class="btn btn-warning">Reset Balance (Test)</button>
+  </div>
+
+  <div id="dice-result" class="dice-result" style="display: none;">
+    <p>You rolled: <span id="dice-values"></span> (Total: <span id="dice-total"></span>)</p>
   </div>
 </div>
 
 <script>
   // Pass game data to the client
   window.gameData = {
+    gameId: <%- game.id %>,
     players: <%- JSON.stringify(players) %>,
-    currentUserId: <%= currentUserId %>
+    currentUserId: <%- currentUserId %>,
+    properties: <%- JSON.stringify(properties) %>
   };
 </script>
 

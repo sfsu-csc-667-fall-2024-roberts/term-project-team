@@ -1,44 +1,42 @@
 import bcrypt from "bcrypt";
-import { createHash } from "crypto";
 import { pool } from "../config";
-import { REGISTER_SQL, FIND_BY_EMAIL_SQL } from "./sql";
+import { REGISTER_SQL, FIND_BY_USERNAME_SQL } from "./sql";
 
 type User = {
   id: number;
   username: string;
-  email: string;
-  gravatar: string;
 };
 
 type UserWithPassword = User & {
-  password: string;
+  hashed_password: string;
 };
 
 const register = async (
   username: string,
-  email: string,
   clearTextPassword: string
 ): Promise<User> => {
-  const password = await bcrypt.hash(clearTextPassword, 10);
-  const gravatar = createHash("sha256").update(email).digest("hex");
-  const result = await pool.query(REGISTER_SQL, [username, email, password, gravatar]);
+  const hashedPassword = await bcrypt.hash(clearTextPassword, 10);
+  const result = await pool.query(REGISTER_SQL, [username, hashedPassword]);
   return result.rows[0];
 };
 
-const login = async (email: string, clearTextPassword: string): Promise<User> => {
-  const user = await findByEmail(email); // Find user by email
-  const isValid = await bcrypt.compare(clearTextPassword, user.password);
+const login = async (username: string, clearTextPassword: string): Promise<User> => {
+  const user = await findByUsername(username);
+  if (!user) {
+    throw new Error("User not found");
+  }
+  const isValid = await bcrypt.compare(clearTextPassword, user.hashed_password);
   if (isValid) {
-    const { password, ...userWithoutPassword } = user; // Exclude password from returned data
-    return userWithoutPassword as User;
+    const { hashed_password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   } else {
     throw new Error("Invalid credentials provided");
   }
 };
 
-const findByEmail = async (email: string): Promise<UserWithPassword> => {
-  const result = await pool.query(FIND_BY_EMAIL_SQL, [email]);
-  return result.rows[0];
+const findByUsername = async (username: string): Promise<UserWithPassword | null> => {
+  const result = await pool.query(FIND_BY_USERNAME_SQL, [username]);
+  return result.rows[0] || null;
 };
 
-export default { register, login, findByEmail };
+export default { register, login, findByUsername };

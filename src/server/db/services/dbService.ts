@@ -1,13 +1,19 @@
 import { pool } from '../config';
 import { User, Game, Player, Property } from '../models/types';
+import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
 
 // User operations
 export async function createUser(username: string, hashedPassword: string): Promise<User> {
-  const result = await pool.query(
-    'INSERT INTO users (username, hashed_password) VALUES ($1, $2) RETURNING *',
-    [username, hashedPassword]
-  );
-  return result.rows[0];
+  try {
+    const result = await pool.query(
+      'INSERT INTO users (username, hashed_password) VALUES ($1, $2) RETURNING id, username, hashed_password',
+      [username, hashedPassword]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error creating user:', error);
+    throw error;
+  }
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
@@ -83,15 +89,24 @@ export async function addPlayerToGame(gameId: number, userId: number): Promise<P
   }
 
   const result = await pool.query(
-    'INSERT INTO players (game_id, user_id) VALUES ($1, $2) RETURNING *',
-    [gameId, userId]
+    'INSERT INTO players (game_id, user_id, balance) VALUES ($1, $2, $3) RETURNING *',
+    [gameId, userId, 1500] // Standard Monopoly starting money
   );
   return result.rows[0];
 }
 
 export async function getGamePlayers(gameId: number): Promise<(Player & { username: string })[]> {
   const result = await pool.query(`
-    SELECT p.*, u.username
+    SELECT 
+      p.id,
+      p.game_id,
+      p.user_id,
+      COALESCE(p.balance, 1500) as balance,
+      COALESCE(p.position, 0) as position,
+      COALESCE(p.jailed, false) as jailed,
+      p.created_at,
+      p.updated_at,
+      u.username
     FROM players p
     JOIN users u ON p.user_id = u.id
     WHERE p.game_id = $1
@@ -195,4 +210,71 @@ export async function updatePropertyState(
     values
   );
   return result.rows[0];
+}
+
+export async function buyProperty(gameId: number, position: number, playerId: number): Promise<Property> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get the property details from board data
+    const propertyData = BOARD_SPACES.find((space: BoardSpace) => space.position === position);
+    if (!propertyData || propertyData.type !== 'property' || !propertyData.price) {
+      throw new Error('Invalid property position or not a purchasable property');
+    }
+
+    // Check if property already exists
+    let property = await getPropertyByPosition(gameId, position);
+    
+    if (property) {
+      throw new Error('Property already owned');
+    }
+
+    // Get player's current balance
+    const playerResult = await client.query(
+      'SELECT balance FROM players WHERE game_id = $1 AND id = $2',
+      [gameId, playerId]
+    );
+
+    if (playerResult.rows.length === 0) {
+      throw new Error('Player not found');
+    }
+
+    const playerBalance = playerResult.rows[0].balance;
+    if (playerBalance < propertyData.price) {
+      throw new Error('Insufficient funds');
+    }
+
+    // Create new property
+    const propertyResult = await client.query(
+      'INSERT INTO properties (game_id, name, owner_id, position) VALUES ($1, $2, $3, $4) RETURNING *',
+      [gameId, propertyData.name, playerId, position]
+    );
+
+    // Deduct money from player
+    const updateResult = await client.query(
+      'UPDATE players SET balance = balance - $1 WHERE game_id = $2 AND id = $3 RETURNING balance',
+      [propertyData.price, gameId, playerId]
+    );
+
+    await client.query('COMMIT');
+    
+    return {
+      ...propertyResult.rows[0],
+      newBalance: updateResult.rows[0].balance
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getPropertyByPosition(gameId: number, position: number): Promise<Property | null> {
+  const result = await pool.query(
+    'SELECT * FROM properties WHERE game_id = $1 AND position = $2',
+    [gameId, position]
+  );
+  return result.rows[0] || null;
 } 

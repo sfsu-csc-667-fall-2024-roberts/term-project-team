@@ -1,7 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth';
 import { pool } from '../db/config';
-import { createGame, getGames, joinGame, createBotPlayer, getUserById } from '../db/services/dbService';
+import { createGame, getGames, joinGame, createBotPlayer, getUserById, deleteGame, leaveGame } from '../db/services/dbService';
 
 const router = express.Router();
 
@@ -37,8 +37,10 @@ router.post('/games', requireAuth, async (req, res) => {
     const game = await createGame(userId);
     
     // Add bot players if requested
-    for (let i = 0; i < botCount; i++) {
-      await createBotPlayer(game.id, i + 1);
+    if (botCount > 0) {
+      for (let i = 0; i < botCount; i++) {
+        await createBotPlayer(game.id, botStrategy, botDifficulty);
+      }
     }
 
     await client.query('COMMIT');
@@ -74,6 +76,40 @@ router.post('/games/:id/join', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Game join error:', error);
     res.redirect('/lobby?error=join-failed');
+  }
+});
+
+// POST /games/:id/delete - Delete a game (owner only)
+router.post('/games/:id/delete', requireAuth, async (req, res) => {
+  try {
+    const gameId = parseInt(req.params.id);
+    if (isNaN(gameId)) {
+      return res.redirect('/lobby?error=invalid-game');
+    }
+
+    const userId = req.session.userId!;
+    await deleteGame(gameId, userId);
+    res.redirect('/lobby');
+  } catch (error) {
+    console.error('Game deletion error:', error);
+    res.redirect('/lobby?error=delete-failed');
+  }
+});
+
+// POST /games/:id/leave - Leave a game
+router.post('/games/:id/leave', requireAuth, async (req, res) => {
+  try {
+    const gameId = parseInt(req.params.id);
+    if (isNaN(gameId)) {
+      return res.redirect('/lobby?error=invalid-game');
+    }
+
+    const userId = req.session.userId!;
+    await leaveGame(gameId, userId);
+    res.redirect('/lobby');
+  } catch (error) {
+    console.error('Game leave error:', error);
+    res.redirect('/lobby?error=leave-failed');
   }
 });
 

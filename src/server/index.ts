@@ -6,7 +6,7 @@ import morgan from "morgan";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db/config";
-import { addUserToLocals, requireAuth } from "./middleware/auth";
+import { addUserToLocals } from "./middleware/auth";
 import * as routes from "./routes";
 import authRoutes from "./routes/auth";
 import lobbyRoutes from "./routes/lobby";
@@ -59,29 +59,51 @@ if (process.env.NODE_ENV !== "production") {
   const livereload = require("livereload");
   const connectLivereload = require("connect-livereload");
   
-  const liveReloadServer = livereload.createServer({
-    port: 35729,
-    // Add error handler to prevent crash on port conflict
-    errorListener: (err: any) => {
-      if (err.code === 'EADDRINUSE') {
-        console.warn('LiveReload port 35729 is in use, live reload will not be available');
-      } else {
-        console.error('LiveReload error:', err);
+  // Try to create LiveReload server with fallback ports
+  const tryCreateLiveReloadServer = async (startPort: number, maxAttempts: number = 10): Promise<void> => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const port = startPort + attempt;
+      try {
+        const liveReloadServer = livereload.createServer({
+          port,
+          delay: 0,
+          protocol: 'http',
+          usePolling: true,
+          exts: ['html', 'css', 'js', 'ts', 'ejs'],
+          exclusions: [/node_modules/],
+          errorListener: (err: any) => {
+            console.error('LiveReload error:', err);
+          }
+        });
+
+        liveReloadServer.watch(staticPath);
+        console.log(`LiveReload server started on port ${port}`);
+        return;
+      } catch (error: any) {
+        if (error.code === 'EADDRINUSE') {
+          console.warn(`LiveReload port ${port} is in use, trying next port...`);
+          continue;
+        }
+        console.error('Failed to start LiveReload server:', error);
+        break;
       }
     }
-  });
-  liveReloadServer.watch(staticPath);
+    console.warn('Could not start LiveReload server after', maxAttempts, 'attempts');
+  };
+
+  // Start with a high port number to avoid conflicts
+  tryCreateLiveReloadServer(35729);
   
   // Add CSP headers for development
   app.use((_req, res, next) => {
     res.setHeader(
       "Content-Security-Policy",
       "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:35729; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*; " +
       "style-src 'self' 'unsafe-inline' 'unsafe-hashes'; " +
       "img-src 'self' data: https:; " +
       "font-src 'self' data:; " +
-      "connect-src 'self' ws://localhost:35729; " +
+      "connect-src 'self' ws://localhost:*; " +
       "base-uri 'self';"
     );
     next();

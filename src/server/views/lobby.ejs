@@ -1,91 +1,173 @@
 <%- include('partials/header') %>
 
 <div class="lobby-container">
-  <h1>Monopoly Online - Game Lobby</h1>
+  <div class="lobby-header">
+    <h1>Monopoly Online - Game Lobby</h1>
+    <p class="lobby-subtitle">Create a new game or join an existing one</p>
+  </div>
 
   <div class="lobby-content">
     <div class="create-game-section">
-      <h2>Create New Game</h2>
+      <div class="section-header">
+        <h2>Create New Game</h2>
+        <p class="section-description">Customize your game settings</p>
+      </div>
+
       <form action="/games" method="POST" class="create-game-form">
         <div class="form-group">
-          <label for="bot-count">Number of Bot Players:</label>
-          <select name="botCount" id="bot-count" class="form-control">
+          <label for="bot-count">Number of Bot Players</label>
+          <select name="botCount" id="bot-count" class="form-control" onchange="toggleBotOptions(this.value)">
             <option value="0">No Bots</option>
             <option value="1">1 Bot</option>
             <option value="2">2 Bots</option>
             <option value="3">3 Bots</option>
           </select>
-          <small class="form-text text-muted">Select how many bot players you want in your game</small>
+          <small class="form-text">Choose how many AI opponents you want to play against</small>
         </div>
 
-        <div class="form-group">
-          <label>Bot Difficulty:</label>
-          <div class="bot-difficulty-options">
-            <label class="radio-label">
-              <input type="radio" name="botDifficulty" value="easy" checked>
-              Easy
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="botDifficulty" value="medium">
-              Medium
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="botDifficulty" value="hard">
-              Hard
-            </label>
+        <div id="bot-options" style="display: none;">
+          <div class="form-group">
+            <label>Bot Difficulty</label>
+            <div class="radio-group bot-difficulty-options">
+              <label class="radio-card">
+                <input type="radio" name="botDifficulty" value="easy" checked>
+                <span class="radio-content">
+                  <span class="radio-title">Easy</span>
+                  <span class="radio-description">Recommended for casual players</span>
+                </span>
+              </label>
+              <label class="radio-card">
+                <input type="radio" name="botDifficulty" value="medium">
+                <span class="radio-content">
+                  <span class="radio-title">Medium</span>
+                  <span class="radio-description">Balanced AI behavior</span>
+                </span>
+              </label>
+              <label class="radio-card">
+                <input type="radio" name="botDifficulty" value="hard">
+                <span class="radio-content">
+                  <span class="radio-title">Hard</span>
+                  <span class="radio-description">For experienced players</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Bot Strategy</label>
+            <div class="radio-group bot-strategy-options">
+              <label class="radio-card">
+                <input type="radio" name="botStrategy" value="balanced" checked>
+                <span class="radio-content">
+                  <span class="radio-title">Balanced</span>
+                  <span class="radio-description">Makes well-rounded decisions</span>
+                </span>
+              </label>
+              <label class="radio-card">
+                <input type="radio" name="botStrategy" value="aggressive">
+                <span class="radio-content">
+                  <span class="radio-title">Aggressive</span>
+                  <span class="radio-description">Focuses on buying and building</span>
+                </span>
+              </label>
+              <label class="radio-card">
+                <input type="radio" name="botStrategy" value="conservative">
+                <span class="radio-content">
+                  <span class="radio-title">Conservative</span>
+                  <span class="radio-description">Plays it safe, saves money</span>
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Bot Strategy:</label>
-          <div class="bot-strategy-options">
-            <label class="radio-label">
-              <input type="radio" name="botStrategy" value="balanced" checked>
-              Balanced
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="botStrategy" value="aggressive">
-              Aggressive
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="botStrategy" value="conservative">
-              Conservative
-            </label>
-          </div>
-        </div>
-
-        <button type="submit" class="btn btn-primary">Create Game</button>
+        <button type="submit" class="btn btn-primary create-game-btn">
+          <span class="btn-icon">🎮</span>
+          Create Game
+        </button>
       </form>
     </div>
 
     <div class="games-section">
-      <h2>Available Games</h2>
+      <div class="section-header">
+        <h2>Available Games</h2>
+        <p class="section-description">Join an existing game session</p>
+      </div>
+
       <div class="games-list">
         <% if (games && games.length > 0) { %>
           <% games.forEach(game => { %>
-            <div class="game-card">
+            <div class="game-card <%= game.status === 'waiting' && game.total_players < 4 ? 'joinable' : '' %>">
               <div class="game-info">
-                <h3>Game #<%= game.id %></h3>
-                <p class="status">Status: <%= game.status %></p>
-                <p class="players">
-                  Players: <%= game.human_count %> human<%= game.human_count !== 1 ? 's' : '' %>, 
-                  <%= game.total_players - game.human_count %> bot<%= (game.total_players - game.human_count) !== 1 ? 's' : '' %> 
-                  (<%= game.total_players %>/4)
-                </p>
-                <% if (game.status === 'waiting' && game.total_players < 4) { %>
-                  <form action="/games/<%= game.id %>/join" method="POST">
-                    <button type="submit" class="btn btn-secondary">Join Game</button>
-                  </form>
-                <% } %>
+                <div class="game-header">
+                  <h3>Game #<%= game.id %></h3>
+                  <span class="game-status <%= game.status %>">
+                    <%= game.status.charAt(0).toUpperCase() + game.status.slice(1) %>
+                  </span>
+                </div>
+                <div class="game-details">
+                  <div class="player-count">
+                    <span class="detail-icon">👥</span>
+                    <span class="detail-text">
+                      <%= game.human_count %> human<%= game.human_count !== 1 ? 's' : '' %>, 
+                      <%= game.total_players - game.human_count %> bot<%= (game.total_players - game.human_count) !== 1 ? 's' : '' %>
+                    </span>
+                  </div>
+                  <div class="total-players">
+                    <span class="detail-icon">🎲</span>
+                    <span class="detail-text"><%= game.total_players %>/4 players</span>
+                  </div>
+                </div>
+                <div class="game-actions">
+                  <% if (game.status === 'waiting' && game.total_players < 4) { %>
+                    <form action="/games/<%= game.id %>/join" method="POST" class="join-form">
+                      <button type="submit" class="btn btn-secondary join-game-btn">
+                        <span class="btn-icon">➡️</span>
+                        Join Game
+                      </button>
+                    </form>
+                  <% } %>
+                  <% if (game.owner_id === user.id) { %>
+                    <form action="/games/<%= game.id %>/delete" method="POST" class="delete-form">
+                      <button type="submit" class="btn btn-danger delete-game-btn">
+                        <span class="btn-icon">🗑️</span>
+                        Delete Game
+                      </button>
+                    </form>
+                  <% } else if (game.status === 'waiting') { %>
+                    <form action="/games/<%= game.id %>/leave" method="POST" class="leave-form">
+                      <button type="submit" class="btn btn-outline leave-game-btn">
+                        <span class="btn-icon">🚪</span>
+                        Leave Game
+                      </button>
+                    </form>
+                  <% } %>
+                </div>
               </div>
             </div>
           <% }); %>
         <% } else { %>
-          <p class="no-games">No games available. Create one!</p>
+          <div class="no-games">
+            <span class="no-games-icon">🎲</span>
+            <p>No games available</p>
+            <p class="no-games-subtitle">Create a new game to start playing!</p>
+          </div>
         <% } %>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+function toggleBotOptions(value) {
+  const botOptions = document.getElementById('bot-options');
+  botOptions.style.display = value === '0' ? 'none' : 'block';
+}
+
+// Initialize bot options visibility based on initial selection
+document.addEventListener('DOMContentLoaded', function() {
+  toggleBotOptions(document.getElementById('bot-count').value);
+});
+</script>
 
 <%- include('partials/footer') %>

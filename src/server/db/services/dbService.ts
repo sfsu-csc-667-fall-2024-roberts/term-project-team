@@ -378,22 +378,48 @@ export async function processRentPayment(
   }
 }
 
-export async function createBotPlayer(gameId: number, botNumber: number): Promise<Player> {
-  const strategies: BotStrategy[] = ['aggressive', 'conservative', 'balanced'];
-  const difficulties: BotDifficulty[] = ['easy', 'medium', 'hard'];
-  
-  const strategy = strategies[Math.floor(Math.random() * strategies.length)];
-  const difficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
-  const botName = BotService.generateBotName(strategy, difficulty);
+export async function createBotPlayer(
+  gameId: number,
+  strategyOrNumber: string | number = 'balanced',
+  difficulty: string = 'medium'
+): Promise<Player> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  const result = await pool.query(
-    `INSERT INTO players 
-     (game_id, user_id, username, is_bot, balance, position, bot_strategy, bot_difficulty) 
-     VALUES ($1, NULL, $2, TRUE, $3, $4, $5, $6) 
-     RETURNING *`,
-    [gameId, botName, 1500, 0, strategy, difficulty]
-  );
-  return result.rows[0];
+    let strategy: string;
+    if (typeof strategyOrNumber === 'number') {
+      const strategies: BotStrategy[] = ['aggressive', 'conservative', 'balanced'];
+      strategy = strategies[Math.floor(Math.random() * strategies.length)];
+    } else {
+      strategy = strategyOrNumber;
+    }
+
+    // Generate bot name based on strategy and difficulty
+    const botName = BotService.generateBotName(strategy, difficulty);
+
+    const result = await client.query(
+      `INSERT INTO players (
+        game_id, 
+        is_bot, 
+        username, 
+        balance, 
+        position,
+        bot_strategy,
+        bot_difficulty
+      ) VALUES ($1, true, $2, 1500, 0, $3, $4)
+      RETURNING *`,
+      [gameId, botName, strategy, difficulty]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function isPlayerBot(gameId: number, playerId: number): Promise<boolean> {
@@ -635,4 +661,78 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
   } finally {
     client.release();
   }
-} 
+}
+
+// Delete a game (owner only)
+export const deleteGame = async (gameId: number, userId: number): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Verify user is the game owner
+    const game = await client.query(
+      'SELECT owner_id FROM games WHERE id = $1',
+      [gameId]
+    );
+
+    if (!game.rows[0] || game.rows[0].owner_id !== userId) {
+      throw new Error('Unauthorized: Only the game owner can delete the game');
+    }
+
+    // Delete all related records (players, properties, etc.)
+    await client.query('DELETE FROM players WHERE game_id = $1', [gameId]);
+    await client.query('DELETE FROM properties WHERE game_id = $1', [gameId]);
+    await client.query('DELETE FROM games WHERE id = $1', [gameId]);
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+// Leave a game
+export const leaveGame = async (gameId: number, userId: number): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Check if game is in waiting status
+    const game = await client.query(
+      'SELECT status FROM games WHERE id = $1',
+      [gameId]
+    );
+
+    if (!game.rows[0] || game.rows[0].status !== 'waiting') {
+      throw new Error('Cannot leave a game that has already started');
+    }
+
+    // Remove the player from the game
+    await client.query(
+      'DELETE FROM players WHERE game_id = $1 AND user_id = $2',
+      [gameId, userId]
+    );
+
+    // Update game status if no players left
+    const remainingPlayers = await client.query(
+      'SELECT COUNT(*) as count FROM players WHERE game_id = $1',
+      [gameId]
+    );
+
+    if (remainingPlayers.rows[0].count === 0) {
+      await client.query(
+        'DELETE FROM games WHERE id = $1',
+        [gameId]
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}; 

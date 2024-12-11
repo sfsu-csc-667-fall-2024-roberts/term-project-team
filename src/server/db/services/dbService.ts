@@ -271,6 +271,64 @@ export async function buyProperty(gameId: number, position: number, playerId: nu
   }
 }
 
+export async function payRent(gameId: number, position: number, tenantId: number, ownerId: number): Promise<{ tenantBalance: number, ownerBalance: number }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get the property details from board data
+    const propertyData = BOARD_SPACES.find((space: BoardSpace) => space.position === position);
+    if (!propertyData || propertyData.type !== 'property' || !propertyData.price || !propertyData.rent) {
+      throw new Error('Invalid property position or not a rentable property');
+    }
+
+    // Check if property already exists
+    let property = await getPropertyByPosition(gameId, position);
+
+    if (!property) {
+      throw new Error('Property not owned');
+    }
+
+    // Get player's current balance
+    const playerResult = await client.query(
+      'SELECT balance FROM players WHERE game_id = $1 AND id = $2',
+      [gameId, tenantId]
+    );
+
+    if (playerResult.rows.length === 0) {
+      throw new Error('Player not found');
+    }
+
+    const playerBalance = playerResult.rows[0].balance;
+    if (playerBalance < propertyData.rent[0]) {
+      // TODO: move to bankrupt or morgage routine
+      throw new Error('Insufficient funds');
+    }
+
+    // Transfer money from tenant to owner
+    const updatedTenantResult = await client.query(
+      'UPDATE players SET balance = balance - $1 WHERE game_id = $2 AND id = $3 RETURNING balance',
+      [propertyData.rent[0], gameId, tenantId]
+    );
+    const updatedOwnerResult = await client.query(
+      'UPDATE players SET balance = balance + $1 WHERE game_id = $2 AND id = $3 RETURNING balance',
+      [propertyData.rent[0], gameId, ownerId]
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      tenantBalance: updatedTenantResult.rows[0].balance,
+      ownerBalance: updatedOwnerResult.rows[0].balance
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function getPropertyByPosition(gameId: number, position: number): Promise<Property | null> {
   const result = await pool.query(
     'SELECT * FROM properties WHERE game_id = $1 AND position = $2',

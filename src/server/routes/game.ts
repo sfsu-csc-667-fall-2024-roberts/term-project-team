@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { getGame, getGamePlayers, getGameProperties, buyProperty, getPropertyByPosition } from '../db/services/dbService';
+import { getGame, getGamePlayers, getGameProperties, buyProperty, getPropertyByPosition, payRent } from '../db/services/dbService';
 import { pool } from '../db/config';
 
 const router = express.Router();
@@ -127,6 +127,56 @@ router.post('/game/:id/reset-balance', requireAuth, async (req: Request, res: Re
   } catch (error) {
     console.error('Reset balance error:', error);
     res.status(500).json({ error: 'Failed to reset balance' });
+  }
+});
+
+// PUT /game/:id/properties/:position/rent - Pay rent
+router.put('/game/:id/properties/:position/rent', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const gameId = parseInt(req.params.id);
+    const position = parseInt(req.params.position);
+
+    if (isNaN(gameId) || isNaN(position)) {
+      res.status(400).json({ error: 'Invalid parameters' });
+      return;
+    }
+
+    const [game, players] = await Promise.all([
+      getGame(gameId),
+      getGamePlayers(gameId)
+    ]);
+
+    if (!game) {
+      res.status(404).json({ error: 'Game not found' });
+      return;
+    }
+
+    // Find the current player
+    const currentPlayer = players.find(p => p.user_id === req.session.userId);
+    if (!currentPlayer) {
+      res.status(403).json({ error: 'Not a player in this game' });
+      return;
+    }
+
+    // Check if property is already owned
+    const existingProperty = await getPropertyByPosition(gameId, position);
+    if (!existingProperty?.owner_id) {
+      res.status(400).json({ error: 'Property not owned' });
+      return;
+    }
+
+    // Pay the rent
+    const rent = await payRent(gameId, position, currentPlayer.id, existingProperty.owner_id);
+
+    // Return the updated property and player data
+    res.json({
+      success: true,
+      playerBalance: rent.tenantBalance,
+      ownerBalance: rent.ownerBalance
+    });
+  } catch (error) {
+    console.error('Pay rent error:', error);
+    res.status(500).json({ error: 'Failed to pay rent' });
   }
 });
 

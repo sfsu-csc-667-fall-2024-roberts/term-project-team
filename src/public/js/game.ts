@@ -121,6 +121,8 @@ class GameService {
 
   private async handlePropertyLanding(space: BoardSpace) {
     const currentPlayer = this.players.find(p => p.user_id === this.currentPlayerId);
+    const ownedProperty = window.gameData.properties.find(p => p.position === space.position);
+
     if (!currentPlayer) {
       console.error('Current player not found');
       return;
@@ -131,7 +133,13 @@ class GameService {
       return;
     }
 
-    if (currentPlayer.balance >= space.price) {
+    if (ownedProperty) {
+      if (ownedProperty.owner_id !== this.currentPlayerId) {
+        const propertyOwner = this.players.find(p => p.id === ownedProperty.owner_id);
+        const propertyData = BOARD_SPACES.find(b => b.position === ownedProperty.position);
+        alert(`Paid ${propertyOwner?.username} $${propertyData?.rent?.[0]} in rent`);
+      }
+    } else if (currentPlayer.balance >= space.price) {
       const wantsToBuy = confirm(
         `Would you like to buy ${space.name} for $${space.price}?`
       );

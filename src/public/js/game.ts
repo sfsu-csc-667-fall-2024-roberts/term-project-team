@@ -134,10 +134,35 @@ class GameService {
     }
 
     if (ownedProperty) {
-      if (ownedProperty.owner_id !== this.currentPlayerId) {
+      if (ownedProperty.owner_id !== this.currentPlayerId && !ownedProperty.mortgaged) {
         const propertyOwner = this.players.find(p => p.id === ownedProperty.owner_id);
         const propertyData = BOARD_SPACES.find(b => b.position === ownedProperty.position);
-        alert(`Paid ${propertyOwner?.username} $${propertyData?.rent?.[0]} in rent`);
+
+        try {
+          const response = await fetch(`/game/${window.gameData.gameId}/properties/${space.position}/rent`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            const errorData = data as ApiError;
+            throw new Error(errorData.error || 'Failed to pay rent');
+          }
+
+          currentPlayer.balance -= propertyData?.rent?.[0] || 0;
+          if (propertyOwner) propertyOwner.balance += propertyData?.rent?.[0] || 0;
+          this.updatePlayerBalanceDisplay(currentPlayer);
+          propertyOwner && this.updatePlayerBalanceDisplay(propertyOwner);
+          alert(`Paid ${propertyOwner?.username} $${propertyData?.rent?.[0]} in rent`);
+      } catch (error) {
+          console.error('Rent error:', error);
+          alert('Failed to pay rent: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        }
+
       }
     } else if (currentPlayer.balance >= space.price) {
       const wantsToBuy = confirm(

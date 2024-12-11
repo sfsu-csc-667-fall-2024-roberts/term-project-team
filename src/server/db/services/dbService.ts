@@ -1,6 +1,6 @@
 import { pool } from '../config';
 import { User, Game, Player, Property } from '../models/types';
-import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
+import { BOARD_SPACES, BoardSpace } from '../../../shared/boardData';
 
 // User operations
 export async function createUser(username: string, hashedPassword: string): Promise<User> {

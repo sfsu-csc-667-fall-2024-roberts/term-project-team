@@ -1,6 +1,10 @@
 import { pool } from '../config';
 import { User, Game, Player, Property } from '../models/types';
-import { BOARD_SPACES, BoardSpace } from '../../../shared/boardData';
+import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
+import { BotService } from '../../services/botService';
+
+type BotStrategy = 'aggressive' | 'conservative' | 'balanced';
+type BotDifficulty = 'easy' | 'medium' | 'hard';
 
 // User operations
 export async function createUser(username: string, hashedPassword: string): Promise<User> {
@@ -22,16 +26,71 @@ export async function getUserByUsername(username: string): Promise<User | null> 
 }
 
 // Game operations
+async function initializeGameProperties(gameId: number, client: any): Promise<void> {
+  // Clear any existing properties for this game
+  await client.query('DELETE FROM properties WHERE game_id = $1', [gameId]);
+  
+  // Initialize properties from board data
+  for (const space of BOARD_SPACES) {
+    if (space.type === 'property') {
+      await client.query(
+        'INSERT INTO properties (game_id, position, name, owner_id, house_count, mortgaged) VALUES ($1, $2, $3, $4, $5, $6)',
+        [gameId, space.position, space.name, null, 0, false]
+      );
+    }
+  }
+}
+
 export async function createGame(ownerId: number): Promise<Game> {
-  const result = await pool.query(
-    'INSERT INTO games (owner_id) VALUES ($1) RETURNING *',
-    [ownerId]
-  );
-  return result.rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Check if user exists and get username
+    const userResult = await client.query('SELECT * FROM users WHERE id = $1', [ownerId]);
+    const user = userResult.rows[0];
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Create game with initial game state
+    const initialGameState = {
+      phase: 'waiting',
+      current_player_index: 0,
+      dice_rolls: [],
+      turn_order: []
+    };
+
+    const gameResult = await client.query(
+      'INSERT INTO games (owner_id, status, game_state) VALUES ($1, $2, $3) RETURNING *',
+      [ownerId, 'waiting', initialGameState]
+    );
+    const game = gameResult.rows[0];
+
+    // Add owner as first player with username
+    await client.query(
+      'INSERT INTO players (game_id, user_id, username, is_bot, balance, position) VALUES ($1, $2, $3, $4, $5, $6)',
+      [game.id, ownerId, user.username, false, 1500, 0]
+    );
+
+    // Initialize game properties
+    await initializeGameProperties(game.id, client);
+
+    await client.query('COMMIT');
+    return game;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getGame(gameId: number): Promise<Game | null> {
-  const result = await pool.query('SELECT * FROM games WHERE id = $1', [gameId]);
+  const result = await pool.query(
+    'SELECT * FROM games WHERE id = $1',
+    [gameId]
+  );
   return result.rows[0] || null;
 }
 
@@ -95,23 +154,11 @@ export async function addPlayerToGame(gameId: number, userId: number): Promise<P
   return result.rows[0];
 }
 
-export async function getGamePlayers(gameId: number): Promise<(Player & { username: string })[]> {
-  const result = await pool.query(`
-    SELECT 
-      p.id,
-      p.game_id,
-      p.user_id,
-      COALESCE(p.balance, 1500) as balance,
-      COALESCE(p.position, 0) as position,
-      COALESCE(p.jailed, false) as jailed,
-      p.created_at,
-      p.updated_at,
-      u.username
-    FROM players p
-    JOIN users u ON p.user_id = u.id
-    WHERE p.game_id = $1
-    ORDER BY p.created_at ASC
-  `, [gameId]);
+export async function getGamePlayers(gameId: number): Promise<Player[]> {
+  const result = await pool.query(
+    'SELECT * FROM players WHERE game_id = $1 ORDER BY id ASC',
+    [gameId]
+  );
   return result.rows;
 }
 
@@ -126,6 +173,7 @@ export async function updatePlayerState(
   if ('balance' in updates && typeof updates.balance === 'number') {
     setClauses.push(`balance = $${paramCount}`);
     values.push(updates.balance);
+    paramCount++;
     paramCount++;
   }
   if ('position' in updates && typeof updates.position === 'number') {
@@ -168,7 +216,7 @@ export async function createProperty(
 
 export async function getGameProperties(gameId: number): Promise<Property[]> {
   const result = await pool.query(
-    'SELECT * FROM properties WHERE game_id = $1 ORDER BY id ASC',
+    'SELECT * FROM properties WHERE game_id = $1 ORDER BY position ASC',
     [gameId]
   );
   return result.rows;
@@ -271,54 +319,55 @@ export async function buyProperty(gameId: number, position: number, playerId: nu
   }
 }
 
-export async function payRent(gameId: number, position: number, tenantId: number, ownerId: number): Promise<{ tenantBalance: number, ownerBalance: number }> {
+export async function getPropertyByPosition(gameId: number, position: number): Promise<Property | null> {
+  const result = await pool.query(
+    'SELECT * FROM properties WHERE game_id = $1 AND position = $2',
+    [gameId, position]
+  );
+  return result.rows[0] || null;
+}
+
+export async function processRentPayment(
+  gameId: number,
+  payerId: number,
+  ownerId: number,
+  rentAmount: number
+): Promise<{ payerBalance: number; ownerBalance: number }> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Get the property details from board data
-    const propertyData = BOARD_SPACES.find((space: BoardSpace) => space.position === position);
-    if (!propertyData || propertyData.type !== 'property' || !propertyData.price || !propertyData.rent) {
-      throw new Error('Invalid property position or not a rentable property');
-    }
-
-    // Check if property already exists
-    let property = await getPropertyByPosition(gameId, position);
-
-    if (!property) {
-      throw new Error('Property not owned');
-    }
-
-    // Get player's current balance
-    const playerResult = await client.query(
+    // Check if payer has enough money
+    const payerResult = await client.query(
       'SELECT balance FROM players WHERE game_id = $1 AND id = $2',
-      [gameId, tenantId]
+      [gameId, payerId]
     );
 
-    if (playerResult.rows.length === 0) {
-      throw new Error('Player not found');
+    if (payerResult.rows.length === 0) {
+      throw new Error('Payer not found');
     }
 
-    const playerBalance = playerResult.rows[0].balance;
-    if (playerBalance < propertyData.rent[0]) {
-      // TODO: move to bankrupt or morgage routine
-      throw new Error('Insufficient funds');
+    const payerBalance = payerResult.rows[0].balance;
+    if (payerBalance < rentAmount) {
+      throw new Error('Insufficient funds to pay rent');
     }
 
-    // Transfer money from tenant to owner
-    const updatedTenantResult = await client.query(
+    // Update payer's balance
+    const updatedPayerResult = await client.query(
       'UPDATE players SET balance = balance - $1 WHERE game_id = $2 AND id = $3 RETURNING balance',
-      [propertyData.rent[0], gameId, tenantId]
+      [rentAmount, gameId, payerId]
     );
+
+    // Update owner's balance
     const updatedOwnerResult = await client.query(
       'UPDATE players SET balance = balance + $1 WHERE game_id = $2 AND id = $3 RETURNING balance',
-      [propertyData.rent[0], gameId, ownerId]
+      [rentAmount, gameId, ownerId]
     );
 
     await client.query('COMMIT');
 
     return {
-      tenantBalance: updatedTenantResult.rows[0].balance,
+      payerBalance: updatedPayerResult.rows[0].balance,
       ownerBalance: updatedOwnerResult.rows[0].balance
     };
   } catch (error) {
@@ -329,10 +378,261 @@ export async function payRent(gameId: number, position: number, tenantId: number
   }
 }
 
-export async function getPropertyByPosition(gameId: number, position: number): Promise<Property | null> {
+export async function createBotPlayer(gameId: number, botNumber: number): Promise<Player> {
+  const strategies: BotStrategy[] = ['aggressive', 'conservative', 'balanced'];
+  const difficulties: BotDifficulty[] = ['easy', 'medium', 'hard'];
+  
+  const strategy = strategies[Math.floor(Math.random() * strategies.length)];
+  const difficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+  const botName = BotService.generateBotName(strategy, difficulty);
+
   const result = await pool.query(
-    'SELECT * FROM properties WHERE game_id = $1 AND position = $2',
-    [gameId, position]
+    `INSERT INTO players 
+     (game_id, user_id, username, is_bot, balance, position, bot_strategy, bot_difficulty) 
+     VALUES ($1, NULL, $2, TRUE, $3, $4, $5, $6) 
+     RETURNING *`,
+    [gameId, botName, 1500, 0, strategy, difficulty]
+  );
+  return result.rows[0];
+}
+
+export async function isPlayerBot(gameId: number, playerId: number): Promise<boolean> {
+  const result = await pool.query(
+    'SELECT is_bot FROM players WHERE game_id = $1 AND id = $2',
+    [gameId, playerId]
+  );
+  return result.rows[0]?.is_bot || false;
+}
+
+async function cleanupStaleGames(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Delete games that are empty (no players)
+    await client.query(`
+      DELETE FROM games 
+      WHERE id IN (
+        SELECT g.id 
+        FROM games g 
+        LEFT JOIN players p ON g.id = p.game_id 
+        GROUP BY g.id 
+        HAVING COUNT(p.id) = 0
+      )
+    `);
+
+    // Mark old waiting games as finished
+    await client.query(`
+      UPDATE games 
+      SET status = 'finished' 
+      WHERE status = 'waiting' 
+      AND created_at < NOW() - INTERVAL '24 hours'
+    `);
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getGames(): Promise<any[]> {
+  await cleanupStaleGames();
+  
+  const result = await pool.query(`
+    SELECT g.*, 
+           COUNT(p.id) filter (where not p.is_bot) as human_count,
+           COUNT(p.id) as total_players
+    FROM games g
+    LEFT JOIN players p ON g.id = p.game_id
+    WHERE g.status = 'waiting'
+    GROUP BY g.id
+    ORDER BY g.created_at DESC
+  `);
+  return result.rows;
+}
+
+export async function getUserById(userId: number): Promise<User | null> {
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+  return result.rows[0] || null;
+}
+
+async function isPlayerInAnyGame(userId: number): Promise<boolean> {
+  const result = await pool.query(`
+    SELECT COUNT(*) as count 
+    FROM players p 
+    JOIN games g ON p.game_id = g.id 
+    WHERE p.user_id = $1 
+    AND g.status = 'waiting' 
+    AND NOT p.is_bot
+  `, [userId]);
+  return parseInt(result.rows[0].count) > 0;
+}
+
+async function leaveExistingGames(userId: number): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get all games where the user is a player
+    const games = await client.query(`
+      SELECT DISTINCT g.id 
+      FROM games g 
+      JOIN players p ON g.id = p.game_id 
+      WHERE p.user_id = $1 AND g.status = 'waiting'
+    `, [userId]);
+
+    // Remove the player from these games
+    for (const game of games.rows) {
+      await client.query(
+        'DELETE FROM players WHERE game_id = $1 AND user_id = $2',
+        [game.id, userId]
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function joinGame(gameId: number, userId: number): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Check if user exists
+    const userResult = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
+    if (!userResult.rows[0]) {
+      throw new Error('User not found');
+    }
+
+    // Leave any existing games
+    await leaveExistingGames(userId);
+
+    // Check if player is already in this specific game
+    const existingPlayer = await client.query(
+      'SELECT * FROM players WHERE game_id = $1 AND user_id = $2',
+      [gameId, userId]
+    );
+
+    if (existingPlayer.rows.length > 0) {
+      throw new Error('Already in this game');
+    }
+
+    // Check player count
+    const playerCount = await client.query(
+      'SELECT COUNT(*) as count FROM players WHERE game_id = $1',
+      [gameId]
+    );
+
+    if (playerCount.rows[0].count >= 4) {
+      throw new Error('Game is full');
+    }
+
+    // Add player to game
+    await client.query(
+      'INSERT INTO players (game_id, user_id, username, is_bot) VALUES ($1, $2, $3, $4)',
+      [gameId, userId, userResult.rows[0].username, false]
+    );
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateGameState(gameId: number, gameState: any): Promise<void> {
+  await pool.query(
+    'UPDATE games SET game_state = $1 WHERE id = $2',
+    [gameState, gameId]
+  );
+}
+
+export async function getGameById(gameId: number): Promise<Game | null> {
+  const result = await pool.query(
+    'SELECT * FROM games WHERE id = $1',
+    [gameId]
   );
   return result.rows[0] || null;
+}
+
+export async function payRent(gameId: number, playerId: number, propertyPosition: number): Promise<{ tenantBalance: number; ownerBalance: number }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get property and its owner
+    const propertyResult = await client.query(
+      'SELECT * FROM properties WHERE game_id = $1 AND position = $2',
+      [gameId, propertyPosition]
+    );
+    const property = propertyResult.rows[0];
+
+    if (!property || !property.owner_id) {
+      throw new Error('Property not found or has no owner');
+    }
+
+    // Get the property details from board data
+    const boardSpace = BOARD_SPACES[propertyPosition];
+    if (!boardSpace || boardSpace.type !== 'property' || typeof boardSpace.rent !== 'number') {
+      throw new Error('Invalid property position');
+    }
+
+    // Get player and owner information
+    const [playerResult, ownerResult] = await Promise.all([
+      client.query('SELECT * FROM players WHERE id = $1', [playerId]),
+      client.query('SELECT * FROM players WHERE id = $1', [property.owner_id])
+    ]);
+
+    const player = playerResult.rows[0];
+    const owner = ownerResult.rows[0];
+
+    if (!player || !owner) {
+      throw new Error('Player or owner not found');
+    }
+
+    // Calculate rent based on property state
+    const baseRent: number = boardSpace.rent;
+    let rentAmount: number = baseRent;
+    if (property.house_count > 0) {
+      rentAmount = baseRent * (property.house_count + 1);
+    }
+
+    // Check if player can afford rent
+    if (player.balance < rentAmount) {
+      throw new Error('Insufficient funds to pay rent');
+    }
+
+    // Transfer rent money
+    const newTenantBalance: number = player.balance - rentAmount;
+    const newOwnerBalance: number = owner.balance + rentAmount;
+
+    await Promise.all([
+      client.query(
+        'UPDATE players SET balance = $1 WHERE id = $2',
+        [newTenantBalance, playerId]
+      ),
+      client.query(
+        'UPDATE players SET balance = $1 WHERE id = $2',
+        [newOwnerBalance, property.owner_id]
+      )
+    ]);
+
+    await client.query('COMMIT');
+    return { tenantBalance: newTenantBalance, ownerBalance: newOwnerBalance };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 } 

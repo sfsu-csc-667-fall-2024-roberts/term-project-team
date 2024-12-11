@@ -3,22 +3,49 @@
 <div class="game-container">
   <div class="game-header">
     <h1>Game #<%= game.id %></h1>
-    <div class="game-status">Status: <%= game.status %></div>
+    <div class="game-status-wrapper">
+      <div class="game-status">
+        <% if (gameState.phase === 'waiting') { %>
+          Status: Initial Roll Phase - Roll to determine turn order
+        <% } else { %>
+          Status: <%= game.status %>
+        <% } %>
+      </div>
+    </div>
   </div>
 
   <div class="game-content">
     <div class="players-section">
       <h2>Players</h2>
       <div class="players-list">
-        <% players.forEach(player => { %>
-          <div class="player-card <%= player.user_id === currentUserId ? 'current-player' : '' %>" 
-               data-player-id="<%= player.user_id %>">
+        <% 
+          // Sort players: humans first, then bots
+          const sortedPlayers = [...players].sort((a, b) => {
+            if (a.is_bot === b.is_bot) return 0;
+            return a.is_bot ? 1 : -1;
+          });
+        %>
+        <% sortedPlayers.forEach(player => { %>
+          <div class="player-card <%= player.id === currentPlayerId ? 'current-player' : '' %> <%= player.is_bot ? 'bot-player' : '' %>">
             <div class="player-info">
-              <h3><%= player.username %></h3>
-              <p class="balance">Balance: $<%= player.balance || 0 %></p>
-              <p class="position">Position: <%= player.position || 0 %></p>
-              <% if (player.jailed) { %>
-                <p class="jailed-status">In Jail</p>
+              <h3>
+                <%= player.username %> 
+                <% if (player.id === currentPlayerId) { %>
+                  (You)
+                <% } %>
+                <% if (player.is_bot) { %>
+                  <span class="bot-badge" title="Bot Strategy: <%= player.bot_strategy || 'balanced' %>, Difficulty: <%= player.bot_difficulty || 'medium' %>">🤖</span>
+                <% } %>
+              </h3>
+              <p class="balance">Balance: $<%= player.balance %></p>
+              <p class="position">Position: <%= player.position %></p>
+              <% if (gameState.phase === 'waiting') { %>
+                <% const roll = gameState.dice_rolls.find(r => r.playerId === player.id); %>
+                <% if (roll) { %>
+                  <p class="roll">Initial Roll: <%= roll.roll %></p>
+                <% } else { %>
+                  <p class="roll">Waiting for roll...</p>
+                <% } %>
               <% } %>
             </div>
           </div>
@@ -26,53 +53,42 @@
       </div>
     </div>
 
-    <div class="game-board">
-      <div id="monopoly-board"></div>
+    <div class="game-board-wrapper">
+      <div class="game-board">
+        <div id="monopoly-board"></div>
+      </div>
+      <div class="game-controls">
+        <button id="roll-dice" class="btn btn-primary" 
+          <%= (gameState.phase === 'waiting' && !gameState.dice_rolls.find(r => r.playerId === currentPlayerId)) || 
+              (gameState.phase === 'playing' && gameState.turn_order[gameState.current_player_index] === currentPlayerId) 
+              ? '' : 'disabled' %>>
+          Roll Dice
+        </button>
+        <button id="end-turn" class="btn btn-secondary" disabled>End Turn</button>
+      </div>
     </div>
 
     <div class="properties-section">
       <h2>Properties</h2>
       <div class="properties-list">
-        <% properties.forEach(property => { %>
-          <div class="property-card">
-            <div class="property-info">
-              <h3><%= property.name %></h3>
-              <% if (property.owner_id) { %>
-                <p>Owner: <%= players.find(p => p.user_id === property.owner_id)?.username || 'Unknown' %></p>
-              <% } else { %>
-                <p>Unowned</p>
-              <% } %>
-              <% if (property.house_count > 0) { %>
-                <p>Houses: <%= property.house_count %></p>
-              <% } %>
-              <% if (property.mortgaged) { %>
-                <p class="mortgaged-status">Mortgaged</p>
-              <% } %>
-            </div>
-          </div>
-        <% }); %>
+        <% if (gameState.phase === 'waiting') { %>
+          <p class="no-properties">Properties will be available once the game starts</p>
+        <% } %>
       </div>
     </div>
   </div>
 
-  <div class="game-controls">
-    <button id="roll-dice" class="btn btn-primary">Roll Dice</button>
-    <button id="end-turn" class="btn btn-secondary">End Turn</button>
-    <button id="reset-balance" class="btn btn-warning">Reset Balance (Test)</button>
-  </div>
-
-  <div id="dice-result" class="dice-result" style="display: none;">
-    <p>You rolled: <span id="dice-values"></span> (Total: <span id="dice-total"></span>)</p>
-  </div>
+  <div class="game-messages"></div>
 </div>
 
 <script>
-  // Pass game data to the client
   window.gameData = {
-    gameId: <%- game.id %>,
+    gameId: <%= game.id %>,
     players: <%- JSON.stringify(players) %>,
-    currentUserId: <%- currentUserId %>,
-    properties: <%- JSON.stringify(properties) %>
+    currentUserId: <%= currentUserId %>,
+    currentPlayerId: <%= currentPlayerId %>,
+    properties: <%- JSON.stringify(properties) %>,
+    gameState: <%- JSON.stringify(gameState) %>
   };
 </script>
 

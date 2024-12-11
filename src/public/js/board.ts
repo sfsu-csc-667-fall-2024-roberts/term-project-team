@@ -2,159 +2,168 @@ import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
 import { Property } from './types';
 
 class MonopolyBoard {
-  private boardElement: HTMLElement;
-  private playerTokens: Map<number, HTMLElement> = new Map();
-  private playerColors: string[] = ['#ff0000', '#00ff00', '#0000ff', '#ffff00'];
+  private container: HTMLElement;
+  private playerTokens: Map<number, HTMLElement>;
+  private propertyOwnership: Map<number, number>;
 
-  constructor(elementId: string) {
-    const element = document.getElementById(elementId);
+  constructor(containerId: string) {
+    const element = document.getElementById(containerId);
     if (!element) {
-      throw new Error(`Element with id ${elementId} not found`);
+      throw new Error(`Element with id ${containerId} not found`);
     }
-    this.boardElement = element;
+    this.container = element;
+    this.playerTokens = new Map();
+    this.propertyOwnership = new Map();
     this.initializeBoard();
   }
 
-  private initializeBoard() {
-    const orderedSpaces = [...BOARD_SPACES].sort((a, b) => a.position - b.position);
-    orderedSpaces.forEach(space => {
-      const spaceElement = this.createSpaceElement(space);
-      this.boardElement.appendChild(spaceElement);
+  private initializeBoard(): void {
+    // Clear existing content
+    this.container.innerHTML = '';
+
+    // Add board spaces
+    BOARD_SPACES.forEach(space => {
+      const spaceElement = this.createBoardSpace(space);
+      this.container.appendChild(spaceElement);
     });
+
+    // Add center area
+    const centerArea = document.createElement('div');
+    centerArea.className = 'board-center';
+    centerArea.textContent = 'MONOPOLY';
+    this.container.appendChild(centerArea);
   }
 
-  private createSpaceElement(space: BoardSpace): HTMLElement {
+  private createBoardSpace(space: BoardSpace): HTMLElement {
     const spaceElement = document.createElement('div');
     spaceElement.className = `board-space pos-${space.position}`;
-    spaceElement.dataset.position = space.position.toString();
+    
+    // Add type-specific classes
+    if (space.type === 'property') {
+      spaceElement.classList.add('space-property');
+    } else if (space.type === 'railroad') {
+      spaceElement.classList.add('space-railroad');
+    } else if (space.type === 'utility') {
+      spaceElement.classList.add('space-utility');
+      if (space.name.includes('Water')) {
+        spaceElement.classList.add('water-works');
+      } else if (space.name.includes('Electric')) {
+        spaceElement.classList.add('electric-company');
+      }
+    } else if (space.type === 'tax') {
+      spaceElement.classList.add('space-tax');
+    } else if (space.type === 'chance') {
+      spaceElement.classList.add('space-chance');
+    } else if (space.type === 'chest') {
+      spaceElement.classList.add('space-chest');
+    } else if (space.type === 'corner') {
+      spaceElement.classList.add('space-corner');
+      // Add corner-specific classes
+      if (space.position === 0) spaceElement.classList.add('bottom-right');
+      if (space.position === 10) spaceElement.classList.add('bottom-left');
+      if (space.position === 20) spaceElement.classList.add('top-left');
+      if (space.position === 30) spaceElement.classList.add('top-right');
+    }
 
+    // Add space content
     const content = document.createElement('div');
     content.className = 'space-content';
 
-    if (space.type === 'property') {
-      content.innerHTML = this.createPropertyContent(space);
-    } else {
-      content.innerHTML = `<div class="space-name">${space.name}</div>`;
+    // Add color bar for properties
+    if (space.type === 'property' && space.color) {
+      const colorBar = document.createElement('div');
+      colorBar.className = `property-color-bar color-${space.color}`;
+      content.appendChild(colorBar);
     }
 
+    // Add property info container
+    const infoContainer = document.createElement('div');
+    infoContainer.className = 'property-info';
+
+    // Add name
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'property-name';
+    nameDiv.textContent = space.name;
+    infoContainer.appendChild(nameDiv);
+
+    // Add icon for special spaces
+    if (space.type === 'railroad' || space.type === 'utility' || 
+        space.type === 'chance' || space.type === 'chest') {
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'space-icon';
+      infoContainer.appendChild(iconDiv);
+    }
+
+    // Add price if applicable
+    if (space.price) {
+      const priceDiv = document.createElement('div');
+      priceDiv.className = 'property-price';
+      priceDiv.textContent = `$${space.price}`;
+      infoContainer.appendChild(priceDiv);
+    }
+
+    content.appendChild(infoContainer);
     spaceElement.appendChild(content);
+
     return spaceElement;
   }
 
-  private createPropertyContent(space: BoardSpace): string {
-    return `
-      <div class="property-color-bar ${space.color ? `color-${space.color}` : ''}"></div>
-      <div class="property-info">
-        <div class="property-name">${space.name}</div>
-        <div class="property-price">$${space.price || ''}</div>
-      </div>
-      <div class="property-details">
-        <h4>${space.name}</h4>
-        <p>Price: $${space.price || ''}</p>
-        ${space.rent ? `<p>Rent: $${space.rent[0]}</p>` : ''}
-      </div>
-    `;
-  }
-
-  public updatePropertyOwnership(property: Property, playerIndex: number): void {
-    const spaceElement = this.boardElement.querySelector(`.pos-${property.position}`);
-    if (!spaceElement) return;
-
-    // Remove any existing ownership indicators
-    const existingIndicator = spaceElement.querySelector('.property-owner-indicator');
-    if (existingIndicator) {
-      existingIndicator.remove();
-    }
-
-    // Create new ownership indicator
-    const ownerIndicator = document.createElement('div');
-    ownerIndicator.className = `property-owner-indicator owner-${playerIndex}`;
-    spaceElement.appendChild(ownerIndicator);
-
-    // Update mortgaged status if needed
-    if (property.mortgaged) {
-      spaceElement.classList.add('property-mortgaged');
-    } else {
-      spaceElement.classList.remove('property-mortgaged');
-    }
-
-    // Update house count if any
-    this.updateHouseCount(property);
-  }
-
-  private updateHouseCount(property: Property): void {
-    const spaceElement = this.boardElement.querySelector(`.pos-${property.position}`);
-    if (!spaceElement) return;
-
-    const existingHouses = spaceElement.querySelector('.house-count');
-    if (existingHouses) {
-      existingHouses.remove();
-    }
-
-    if (property.house_count > 0) {
-      const houseContainer = document.createElement('div');
-      houseContainer.className = 'house-count';
-
-      if (property.house_count === 5) {
-        // Show hotel
-        const hotel = document.createElement('div');
-        hotel.className = 'hotel';
-        houseContainer.appendChild(hotel);
-      } else {
-        // Show houses
-        for (let i = 0; i < property.house_count; i++) {
-          const house = document.createElement('div');
-          house.className = 'house';
-          houseContainer.appendChild(house);
-        }
+  public updatePlayerPosition(playerId: number, position: number, playerIndex: number): Promise<void> {
+    return new Promise(resolve => {
+      // Remove existing token if any
+      const existingToken = this.playerTokens.get(playerId);
+      if (existingToken) {
+        existingToken.remove();
       }
 
-      spaceElement.appendChild(houseContainer);
-    }
-  }
+      // Create new token
+      const token = document.createElement('div');
+      token.className = 'player-token';
+      token.classList.add(`player-${playerIndex}`);
 
-  public updatePlayerPosition(playerId: number, position: number, playerIndex: number): Promise<void> {
-    return new Promise((resolve) => {
-      let token = this.playerTokens.get(playerId);
-      
-      if (!token) {
-        // Create new token if it doesn't exist
-        token = document.createElement('div');
-        token.classList.add('player-token');
-        token.style.backgroundColor = this.playerColors[playerIndex % this.playerColors.length];
-        this.boardElement.appendChild(token);
+      // Find the target space
+      const targetSpace = this.container.querySelector(`.pos-${position}`) as HTMLElement;
+      if (targetSpace) {
+        // Calculate center position of the space
+        const rect = targetSpace.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        token.style.left = `${centerX}px`;
+        token.style.top = `${centerY}px`;
+        
+        targetSpace.appendChild(token);
         this.playerTokens.set(playerId, token);
       }
 
-      // Find the target space element
-      const spaceElement = this.boardElement.querySelector(`.pos-${position}`);
-      if (spaceElement instanceof HTMLElement) {
-        const rect = spaceElement.getBoundingClientRect();
-        const boardRect = this.boardElement.getBoundingClientRect();
-        
-        // Calculate relative position within the board
-        const relativeTop = rect.top - boardRect.top;
-        const relativeLeft = rect.left - boardRect.left;
+      // Add animation class for movement
+      token.classList.add('token-move');
 
-        // Calculate offset for multiple players on same space
-        const tokenCount = Array.from(this.playerTokens.values())
-          .filter(t => t.style.top === `${relativeTop}px` && t.style.left === `${relativeLeft}px`)
-          .length;
-        
-        const offset = 12 * tokenCount;
-
-        // Animate the token to new position
-        token.style.transition = 'all 0.5s ease-in-out';
-        token.style.top = `${relativeTop + 30 + Math.floor(offset / 2)}px`;
-        token.style.left = `${relativeLeft + 30 + (offset % 24)}px`;
-
-        // Listen for the transition end to resolve the promise
-        token.addEventListener('transitionend', () => resolve(), { once: true });
-      } else {
-        // If space not found, resolve immediately
+      // Remove animation class after animation completes
+      setTimeout(() => {
+        token.classList.remove('token-move');
         resolve();
-      }
+      }, 500);
     });
+  }
+
+  public updatePropertyOwnership(property: Property, playerIndex: number): void {
+    const spaceElement = this.container.querySelector(`.pos-${property.position}`) as HTMLElement;
+    if (spaceElement) {
+      // Remove any existing ownership indicators
+      const existingIndicator = spaceElement.querySelector('.property-owner-indicator');
+      if (existingIndicator) {
+        existingIndicator.remove();
+      }
+
+      if (property.owner_id !== null && property.owner_id !== undefined) {
+        const indicator = document.createElement('div');
+        indicator.className = `property-owner-indicator owner-${playerIndex}`;
+        spaceElement.appendChild(indicator);
+      }
+
+      this.propertyOwnership.set(property.position, property.owner_id || -1);
+    }
   }
 }
 

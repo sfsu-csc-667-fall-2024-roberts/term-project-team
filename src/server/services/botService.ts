@@ -1,6 +1,5 @@
 import { Player, Property, GameState } from '../db/models/types';
-import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
-import { updatePlayerState, updatePropertyState } from '../db/services/dbService';
+import { BOARD_SPACES } from '../../shared/boardData';
 
 interface BotDecision {
   action: 'buy' | 'pass' | 'pay_rent' | 'end_turn';
@@ -8,11 +7,8 @@ interface BotDecision {
 }
 
 export class BotService {
-  private static readonly PROPERTY_VALUE_THRESHOLD = 0.4; // Bot will buy if property cost is less than 40% of their balance
-  
-  /**
-   * Make a decision for the bot based on the current game state
-   */
+  private static readonly PROPERTY_VALUE_THRESHOLD = 0.4;
+
   static async makeDecision(
     bot: Player,
     gameState: GameState,
@@ -41,9 +37,6 @@ export class BotService {
     return { action: 'end_turn' };
   }
 
-  /**
-   * Decide if the bot should buy a property
-   */
   private static shouldBuyProperty(
     bot: Player,
     property: Property,
@@ -60,7 +53,8 @@ export class BotService {
     const isGoodValue = price <= bot.balance * this.PROPERTY_VALUE_THRESHOLD;
 
     // Strategy-specific logic
-    switch (bot.bot_strategy) {
+    const strategy = bot.bot_strategy ?? 'balanced';
+    switch (strategy) {
       case 'aggressive':
         // Buy if can afford and has less than 70% of properties
         const ownedCount = allProperties.filter(p => p.owner_id === bot.id).length;
@@ -77,9 +71,6 @@ export class BotService {
     }
   }
 
-  /**
-   * Generate a bot name based on strategy and difficulty
-   */
   static generateBotName(strategy: string, difficulty: string): string {
     const strategyNames = {
       aggressive: ['Risky', 'Bold', 'Daring'],

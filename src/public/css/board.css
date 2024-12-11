@@ -4,9 +4,9 @@
   height: 660px;
   background: #C5FFC5;
   position: relative;
-  margin: 0 auto;
+  margin: 0;
   box-sizing: border-box;
-  border: 1px solid #000;
+  border: 2px solid #000;
 }
 
 /* Board spaces */
@@ -17,7 +17,9 @@
   background: #fff;
   border: 1px solid #000;
   box-sizing: border-box;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
 }
 
 /* Space content wrapper */
@@ -27,88 +29,194 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: space-between;
   padding: 2px;
   font-size: 0.6rem;
   text-align: center;
-  transform-origin: center center;
-  transform: rotate(0deg);
 }
 
 /* Property color bars */
 .property-color-bar {
   width: 100%;
-  height: 12px;
-  margin-bottom: 3px;
-  flex-shrink: 0;
+  height: 10px;
+  margin: 0;
 }
 
 /* Property info */
 .property-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
-  height: calc(100% - 15px);
-  padding: 0 2px;
+  padding: 2px;
 }
 
 /* Property name and price */
 .property-name {
-  flex: 1;
-  font-weight: bold;
   font-size: 0.45rem;
   line-height: 1.1;
-  margin: 0;
-  padding: 2px 1px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  margin: 1px 0;
   text-align: center;
   width: 100%;
-  min-height: 0;
 }
 
 .property-price {
   font-size: 0.5rem;
   line-height: 1;
-  padding: 2px 0;
-  margin-top: auto;
-  width: 100%;
+  margin: 1px 0;
   text-align: center;
+  width: 100%;
 }
 
-/* Corner spaces - no rotation */
-.corner .space-content {
-  padding: 4px;
+/* Corner spaces */
+.space-corner {
+  width: 60px;
+  height: 60px;
+  padding: 2px;
+}
+
+.space-corner .space-content {
   font-size: 0.65rem;
   font-weight: bold;
   justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 4px;
 }
 
-/* Special spaces (no color bar) */
-.space-railroad .property-info,
-.space-utility .property-info,
-.space-tax .property-info,
-.space-chance .property-info,
-.space-chest .property-info {
-  height: 100%;
-  padding-top: 4px;
+/* Special spaces */
+.space-railroad .space-content,
+.space-utility .space-content,
+.space-tax .space-content,
+.space-chance .space-content,
+.space-chest .space-content {
+  padding: 2px;
   justify-content: space-between;
 }
 
-/* Special spaces background colors */
-.space-railroad,
-.space-utility,
-.space-tax,
-.space-chance,
-.space-chest {
-  background-color: #f0f0f0;
+/* Space icons */
+.space-icon {
+  font-size: 0.8rem;
+  margin: 1px 0;
 }
+
+/* Position classes */
+/* Bottom row */
+.pos-0 { right: 0; bottom: 0; } /* GO */
+.pos-1 { right: 60px; bottom: 0; }
+.pos-2 { right: 120px; bottom: 0; }
+.pos-3 { right: 180px; bottom: 0; }
+.pos-4 { right: 240px; bottom: 0; }
+.pos-5 { right: 300px; bottom: 0; }
+.pos-6 { right: 360px; bottom: 0; }
+.pos-7 { right: 420px; bottom: 0; }
+.pos-8 { right: 480px; bottom: 0; }
+.pos-9 { right: 540px; bottom: 0; }
+.pos-10 { left: 0; bottom: 0; } /* Jail */
+
+/* Left column */
+.pos-11 { left: 0; bottom: 60px; }
+.pos-12 { left: 0; bottom: 120px; }
+.pos-13 { left: 0; bottom: 180px; }
+.pos-14 { left: 0; bottom: 240px; }
+.pos-15 { left: 0; bottom: 300px; }
+.pos-16 { left: 0; bottom: 360px; }
+.pos-17 { left: 0; bottom: 420px; }
+.pos-18 { left: 0; bottom: 480px; }
+.pos-19 { left: 0; bottom: 540px; }
+.pos-20 { left: 0; top: 0; } /* Free Parking */
+
+/* Top row */
+.pos-21 { left: 60px; top: 0; }
+.pos-22 { left: 120px; top: 0; }
+.pos-23 { left: 180px; top: 0; }
+.pos-24 { left: 240px; top: 0; }
+.pos-25 { left: 300px; top: 0; }
+.pos-26 { left: 360px; top: 0; }
+.pos-27 { left: 420px; top: 0; }
+.pos-28 { left: 480px; top: 0; }
+.pos-29 { left: 540px; top: 0; }
+.pos-30 { right: 0; top: 0; } /* Go to Jail */
+
+/* Right column */
+.pos-31 { right: 0; top: 60px; }
+.pos-32 { right: 0; top: 120px; }
+.pos-33 { right: 0; top: 180px; }
+.pos-34 { right: 0; top: 240px; }
+.pos-35 { right: 0; top: 300px; }
+.pos-36 { right: 0; top: 360px; }
+.pos-37 { right: 0; top: 420px; }
+.pos-38 { right: 0; top: 480px; }
+.pos-39 { right: 0; top: 540px; }
 
 /* Corner colors */
 .space-corner.bottom-right { background-color: #28a745; color: white; } /* GO */
 .space-corner.bottom-left { background-color: #dc3545; color: white; }  /* Jail */
 .space-corner.top-left { background-color: #ffc107; color: black; }     /* Free Parking */
 .space-corner.top-right { background-color: #17a2b8; color: white; }    /* Go to Jail */
+
+/* Property colors */
+.color-brown { background-color: #955436; }
+.color-light-blue { background-color: #AAE0FA; }
+.color-pink { background-color: #D93A96; }
+.color-orange { background-color: #F7941D; }
+.color-red { background-color: #ED1B24; }
+.color-yellow { background-color: #FEF200; }
+.color-green { background-color: #1FB25A; }
+.color-blue { background-color: #0072BB; }
+
+/* Special spaces styling */
+.space-railroad { background: #f0f0f0; }
+.space-utility { background: #f0f0f0; }
+.space-tax { background: #FFE4E1; }
+.space-chance { background: #FFDAB9; }
+.space-chest { background: #E6E6FA; }
+
+/* Railroad icon */
+.space-railroad .space-icon::before {
+  content: "🚂";
+  display: block;
+}
+
+/* Utility icons */
+.space-utility.water-works .space-icon::before {
+  content: "💧";
+  display: block;
+}
+
+.space-utility.electric-company .space-icon::before {
+  content: "⚡";
+  display: block;
+}
+
+/* Chance and Community Chest icons */
+.space-chance .space-icon::before {
+  content: "?";
+  display: block;
+  font-weight: bold;
+}
+
+.space-chest .space-icon::before {
+  content: "📦";
+  display: block;
+}
+
+/* Center logo */
+.board-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3rem;
+  font-weight: bold;
+  color: #000;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+  white-space: nowrap;
+  z-index: 1;
+  text-align: center;
+}
 
 /* Player tokens */
 .player-token {
@@ -122,64 +230,11 @@
   transition: all 0.3s ease;
 }
 
-/* Property colors */
-.color-brown { background-color: #955436; }
-.color-light-blue { background-color: #AAE0FA; }
-.color-pink { background-color: #D93A96; }
-.color-orange { background-color: #F7941D; }
-.color-red { background-color: #ED1B24; }
-.color-yellow { background-color: #FEF200; }
-.color-green { background-color: #1FB25A; }
-.color-blue { background-color: #0072BB; }
-
-/* Position classes */
-/* Bottom row */
-.pos-0 { right: 0; bottom: 0; }
-.pos-1 { right: 60px; bottom: 0; }
-.pos-2 { right: 120px; bottom: 0; }
-.pos-3 { right: 180px; bottom: 0; }
-.pos-4 { right: 240px; bottom: 0; }
-.pos-5 { right: 300px; bottom: 0; }
-.pos-6 { right: 360px; bottom: 0; }
-.pos-7 { right: 420px; bottom: 0; }
-.pos-8 { right: 480px; bottom: 0; }
-.pos-9 { right: 540px; bottom: 0; }
-.pos-10 { left: 0; bottom: 0; }
-
-/* Left column */
-.pos-11 { left: 0; bottom: 60px; }
-.pos-12 { left: 0; bottom: 120px; }
-.pos-13 { left: 0; bottom: 180px; }
-.pos-14 { left: 0; bottom: 240px; }
-.pos-15 { left: 0; bottom: 300px; }
-.pos-16 { left: 0; bottom: 360px; }
-.pos-17 { left: 0; bottom: 420px; }
-.pos-18 { left: 0; bottom: 480px; }
-.pos-19 { left: 0; bottom: 540px; }
-.pos-20 { left: 0; top: 0; }
-
-/* Top row */
-.pos-21 { left: 60px; top: 0; }
-.pos-22 { left: 120px; top: 0; }
-.pos-23 { left: 180px; top: 0; }
-.pos-24 { left: 240px; top: 0; }
-.pos-25 { left: 300px; top: 0; }
-.pos-26 { left: 360px; top: 0; }
-.pos-27 { left: 420px; top: 0; }
-.pos-28 { left: 480px; top: 0; }
-.pos-29 { left: 540px; top: 0; }
-.pos-30 { right: 0; top: 0; }
-
-/* Right column */
-.pos-31 { right: 0; top: 60px; }
-.pos-32 { right: 0; top: 120px; }
-.pos-33 { right: 0; top: 180px; }
-.pos-34 { right: 0; top: 240px; }
-.pos-35 { right: 0; top: 300px; }
-.pos-36 { right: 0; top: 360px; }
-.pos-37 { right: 0; top: 420px; }
-.pos-38 { right: 0; top: 480px; }
-.pos-39 { right: 0; top: 540px; }
+/* Player colors */
+.player-0 { background-color: #ff0000; }  /* Red */
+.player-1 { background-color: #00ff00; }  /* Green */
+.player-2 { background-color: #0000ff; }  /* Blue */
+.player-3 { background-color: #ffff00; }  /* Yellow */
 
 /* Property ownership indicators */
 .property-owner-indicator {
@@ -193,81 +248,9 @@
   z-index: 5;
 }
 
-/* Player colors for ownership */
+/* Owner colors */
 .owner-0 { background-color: #ff0000; }  /* Red */
 .owner-1 { background-color: #00ff00; }  /* Green */
 .owner-2 { background-color: #0000ff; }  /* Blue */
 .owner-3 { background-color: #ffff00; }  /* Yellow */
-
-/* Property state indicators */
-.property-mortgaged::after {
-  content: 'M';
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 0.5rem;
-  font-weight: bold;
-  color: #ff0000;
-  background: white;
-  border-radius: 50%;
-  width: 10px;
-  height: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #ff0000;
-}
-
-/* House/Hotel indicators */
-.house-count {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-evenly;
-  padding: 2px;
-}
-
-.house {
-  width: 8px;
-  height: 8px;
-  background-color: #00ff00;
-  margin: 0 1px;
-}
-
-.hotel {
-  width: 12px;
-  height: 8px;
-  background-color: #ff0000;
-  margin: 0 auto;
-}
-
-/* Property hover effect with details */
-.board-space:hover .property-details {
-  display: block;
-  position: absolute;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #000;
-  padding: 4px;
-  font-size: 0.7rem;
-  z-index: 100;
-  width: 120px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.property-details {
-  display: none;
-  transform: rotate(0deg) !important;
-}
-
-.property-details h4 {
-  margin: 0 0 4px 0;
-  font-size: 0.8rem;
-}
-
-.property-details p {
-  margin: 2px 0;
-  font-size: 0.7rem;
-}
  

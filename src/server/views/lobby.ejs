@@ -1,75 +1,91 @@
 <%- include('partials/header') %>
 
 <div class="lobby-container">
-  <h1>Game Lobby</h1>
+  <h1>Monopoly Online - Game Lobby</h1>
 
-  <% if (error) { %>
-    <div class="error-message">
-      <%= error %>
-    </div>
-  <% } %>
+  <div class="lobby-content">
+    <div class="create-game-section">
+      <h2>Create New Game</h2>
+      <form action="/games" method="POST" class="create-game-form">
+        <div class="form-group">
+          <label for="bot-count">Number of Bot Players:</label>
+          <select name="botCount" id="bot-count" class="form-control">
+            <option value="0">No Bots</option>
+            <option value="1">1 Bot</option>
+            <option value="2">2 Bots</option>
+            <option value="3">3 Bots</option>
+          </select>
+          <small class="form-text text-muted">Select how many bot players you want in your game</small>
+        </div>
 
-  <div class="create-game">
-    <form action="/games" method="POST">
-      <button type="submit" class="btn btn-primary">Create New Game</button>
-    </form>
-  </div>
-
-  <div class="games-section">
-    <h2>My Games</h2>
-    <% if (myGames.length === 0) { %>
-      <p class="no-games">You haven't joined any games yet.</p>
-    <% } else { %>
-      <div class="games-list">
-        <% myGames.forEach(game => { %>
-          <div class="game-card">
-            <div class="game-info">
-              <h3>Game #<%= game.id %></h3>
-              <p>Created by: <%= game.owner_username %></p>
-              <p>Status: <%= game.status %></p>
-              <p>Players: <%= game.player_count %></p>
-              <p>Created: <%= new Date(game.created_at).toLocaleString() %></p>
-            </div>
-            <div class="game-actions">
-              <form action="/game/<%= game.id %>" method="GET">
-                <button type="submit" class="btn btn-secondary">Enter Game</button>
-              </form>
-            </div>
+        <div class="form-group">
+          <label>Bot Difficulty:</label>
+          <div class="bot-difficulty-options">
+            <label class="radio-label">
+              <input type="radio" name="botDifficulty" value="easy" checked>
+              Easy
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="botDifficulty" value="medium">
+              Medium
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="botDifficulty" value="hard">
+              Hard
+            </label>
           </div>
-        <% }); %>
-      </div>
-    <% } %>
-  </div>
+        </div>
 
-  <div class="games-section">
-    <h2>Available Games</h2>
-    <% if (allGames.length === 0) { %>
-      <p class="no-games">No games available. Why not create one?</p>
-    <% } else { %>
+        <div class="form-group">
+          <label>Bot Strategy:</label>
+          <div class="bot-strategy-options">
+            <label class="radio-label">
+              <input type="radio" name="botStrategy" value="balanced" checked>
+              Balanced
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="botStrategy" value="aggressive">
+              Aggressive
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="botStrategy" value="conservative">
+              Conservative
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create Game</button>
+      </form>
+    </div>
+
+    <div class="games-section">
+      <h2>Available Games</h2>
       <div class="games-list">
-        <% allGames.forEach(game => { %>
-          <% if (!myGames.find(g => g.id === game.id)) { %>
+        <% if (games && games.length > 0) { %>
+          <% games.forEach(game => { %>
             <div class="game-card">
               <div class="game-info">
                 <h3>Game #<%= game.id %></h3>
-                <p>Created by: <%= game.owner_username %></p>
-                <p>Status: <%= game.status %></p>
-                <p>Players: <%= game.player_count %></p>
-                <p>Created: <%= new Date(game.created_at).toLocaleString() %></p>
-              </div>
-              <div class="game-actions">
-                <% if (game.status === 'waiting') { %>
+                <p class="status">Status: <%= game.status %></p>
+                <p class="players">
+                  Players: <%= game.human_count %> human<%= game.human_count !== 1 ? 's' : '' %>, 
+                  <%= game.total_players - game.human_count %> bot<%= (game.total_players - game.human_count) !== 1 ? 's' : '' %> 
+                  (<%= game.total_players %>/4)
+                </p>
+                <% if (game.status === 'waiting' && game.total_players < 4) { %>
                   <form action="/games/<%= game.id %>/join" method="POST">
-                    <button type="submit" class="btn btn-primary">Join Game</button>
+                    <button type="submit" class="btn btn-secondary">Join Game</button>
                   </form>
                 <% } %>
               </div>
             </div>
-          <% } %>
-        <% }); %>
+          <% }); %>
+        <% } else { %>
+          <p class="no-games">No games available. Create one!</p>
+        <% } %>
       </div>
-    <% } %>
+    </div>
   </div>
 </div>
 
-<%- include('partials/footer') %> 
+<%- include('partials/footer') %>

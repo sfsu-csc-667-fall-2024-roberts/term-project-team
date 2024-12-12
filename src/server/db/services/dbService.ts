@@ -609,7 +609,7 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
 
     // Get the property details from board data
     const boardSpace = BOARD_SPACES[propertyPosition];
-    if (!boardSpace || boardSpace.type !== 'property' || typeof boardSpace.rent !== 'number') {
+    if (!boardSpace || boardSpace.type !== 'property' || typeof boardSpace.rent !== 'object') {
       throw new Error('Invalid property position');
     }
 
@@ -627,11 +627,8 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
     }
 
     // Calculate rent based on property state
-    const baseRent: number = boardSpace.rent;
-    let rentAmount: number = baseRent;
-    if (property.house_count > 0) {
-      rentAmount = baseRent * (property.house_count + 1);
-    }
+    const baseRent: number = boardSpace.rent[0];
+    const rentAmount: number = baseRent * (property.house_count + 1);
 
     // Check if player can afford rent
     if (player.balance < rentAmount) {

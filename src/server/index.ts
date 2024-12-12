@@ -61,34 +61,41 @@ if (process.env.NODE_ENV !== "production") {
   
   // Try to create LiveReload server with fallback ports
   const tryCreateLiveReloadServer = async (startPort: number, maxAttempts: number = 10): Promise<void> => {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const port = startPort + attempt;
-      try {
-        const liveReloadServer = livereload.createServer({
-          port,
-          delay: 0,
-          protocol: 'http',
-          usePolling: true,
-          exts: ['html', 'css', 'js', 'ts', 'ejs'],
-          exclusions: [/node_modules/],
-          errorListener: (err: any) => {
-            console.error('LiveReload error:', err);
-          }
-        });
+    try {
+      console.log('Skipping LiveReload server for testing');
+      // Commented out for testing
+      /*
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const port = startPort + attempt;
+        try {
+          const liveReloadServer = livereload.createServer({
+            port,
+            delay: 0,
+            protocol: 'http',
+            usePolling: true,
+            exts: ['html', 'css', 'js', 'ts', 'ejs'],
+            exclusions: [/node_modules/],
+            errorListener: (err: any) => {
+              console.error('LiveReload error:', err);
+            }
+          });
 
-        liveReloadServer.watch(staticPath);
-        console.log(`LiveReload server started on port ${port}`);
-        return;
-      } catch (error: any) {
-        if (error.code === 'EADDRINUSE') {
-          console.warn(`LiveReload port ${port} is in use, trying next port...`);
-          continue;
+          liveReloadServer.watch(staticPath);
+          console.log(`LiveReload server started on port ${port}`);
+          return;
+        } catch (error: any) {
+          if (error.code === 'EADDRINUSE') {
+            console.warn(`LiveReload port ${port} is in use, trying next port...`);
+            continue;
+          }
+          console.error('Failed to start LiveReload server:', error);
+          break;
         }
-        console.error('Failed to start LiveReload server:', error);
-        break;
       }
+      */
+    } catch (error) {
+      console.warn('Could not start LiveReload server:', error);
     }
-    console.warn('Could not start LiveReload server after', maxAttempts, 'attempts');
   };
 
   // Start with a high port number to avoid conflicts

@@ -6,7 +6,7 @@ class MonopolyBoard {
   private playerTokens: Map<number, HTMLElement>;
   private propertyOwnership: Map<number, number>;
   private playerColors = ['#90EE90', '#FFB6C1', '#87CEEB', '#DDA0DD'];
-  private currentPlayerId: number;
+  private currentPlayerId: number | null = null;
 
   constructor(containerId: string) {
     const element = document.getElementById(containerId);
@@ -184,6 +184,20 @@ class MonopolyBoard {
 
       this.propertyOwnership.set(property.position, property.owner_id || -1);
     }
+  }
+
+  public setCurrentPlayer(playerId: number): void {
+    this.currentPlayerId = playerId;
+    // Update token highlights
+    this.playerTokens.forEach((token, tokenPlayerId) => {
+      if (tokenPlayerId === playerId) {
+        token.style.transform = 'scale(1.2)';
+        token.style.boxShadow = '0 0 10px rgba(255,255,0,0.5)';
+      } else {
+        token.style.transform = 'scale(1)';
+        token.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+      }
+    });
   }
 }
 

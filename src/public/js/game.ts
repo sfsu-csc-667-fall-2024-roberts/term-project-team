@@ -186,6 +186,10 @@ class GameService {
     if (!this.statusElement) return;
     
     const currentPlayer = this.getNextPlayer();
+    if (currentPlayer) {
+      this.board.setCurrentPlayer(currentPlayer.id);
+    }
+    
     let statusText = '';
     
     if (this.gameData.gameState.phase === 'waiting') {

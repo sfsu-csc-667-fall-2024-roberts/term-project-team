@@ -1,11 +1,12 @@
 import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
-import { Property } from './types';
+import { ApiError, Player, Property, PurchaseResponse } from './types';
 
 class MonopolyBoard {
   private container: HTMLElement;
   private centerArea: HTMLDivElement;
   private playerTokens: Map<number, HTMLElement>;
   private propertyOwnership: Map<number, number>;
+  private promptBuying: boolean;
 
   constructor(containerId: string) {
     const element = document.getElementById(containerId);
@@ -16,6 +17,7 @@ class MonopolyBoard {
     this.centerArea = document.createElement('div');
     this.playerTokens = new Map();
     this.propertyOwnership = new Map();
+    this.promptBuying = false;
     this.initializeBoard();
   }
 
@@ -107,15 +109,19 @@ class MonopolyBoard {
     spaceElement.appendChild(content);
 
     spaceElement.addEventListener('mouseover', () => {
-      const element = spaceElement.cloneNode(true) as HTMLDivElement;
-      element.classList.remove(`pos-${space.position}`);
-      element.classList.add('board-center-card');
-      element.getElementsByClassName('player-token')[0]?.remove();
-      this.setCenter(element);
+      if (!this.promptBuying) {
+        const element = spaceElement.cloneNode(true) as HTMLDivElement;
+        element.classList.remove(`pos-${space.position}`);
+        element.classList.add('board-center-card');
+        element.getElementsByClassName('player-token')[0]?.remove();
+        this.setCenter(element);
+      }
     })
 
     spaceElement.addEventListener('mouseleave', () => {
-      this.resetCenter();
+      if (!this.promptBuying) {
+        this.resetCenter();
+      }
     })
 
     return spaceElement;
@@ -176,6 +182,88 @@ class MonopolyBoard {
       }
 
       this.propertyOwnership.set(property.position, property.owner_id || -1);
+    }
+  }
+
+  public showBuyOption(player: Player, cb: () => void): void {
+    const position = player.position;
+    const ownedProperty = this.propertyOwnership.get(position);
+    const property = BOARD_SPACES[position];
+    if (ownedProperty !== undefined) {
+      // TODO: Implement rent logic
+      cb();
+    } else if (property.price && player.balance >= property.price) {
+      this.promptBuying = true;
+
+      const container = document.createElement('div');
+      container.className = 'board-center-prompt';
+
+      // board card
+      const targetSpace = this.container.querySelector(`.pos-${position}`) as HTMLElement;
+      const element = targetSpace.cloneNode(true) as HTMLDivElement;
+      element.classList.remove(`pos-${position}`);
+      element.classList.add('board-center-card');
+      element.getElementsByClassName('player-token')[0]?.remove();
+      const card = document.createElement('div');
+      card.className = 'board-center-card-wrapper';
+      card.appendChild(element);
+      container.appendChild(card);
+
+      // buttons
+      const buttons = document.createElement('div');
+      buttons.className = 'board-center-options';
+      const buy = document.createElement('button');
+      buy.className = 'btn btn-primary';
+      buy.innerText = 'Buy'
+      const skip = document.createElement('button');
+      skip.className = 'btn btn-secondary';
+      skip.innerText = 'Skip'
+      buttons.appendChild(buy);
+      buttons.appendChild(skip)
+      container.appendChild(buttons);
+  
+      // FIXME: Not working at the moment
+      buy.addEventListener('click', async () => {
+        try {
+          const response = await fetch(`/game/${window.gameData.gameId}/properties/${position}/buy`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            const errorData = data as ApiError;
+            throw new Error(errorData.error || 'Failed to purchase property');
+          }
+
+          const purchaseData = data as PurchaseResponse;
+
+          // Update player's balance
+          player.balance = purchaseData.playerBalance;
+
+          // Update property ownership display
+          this.updatePropertyOwnership(purchaseData.property, player.id);
+        } catch (error) {
+          console.error('Purchase error:', error);
+        } finally {
+          this.resetCenter();
+          cb();
+        }
+      });
+
+      skip.addEventListener('click', () => {
+        this.promptBuying = false;
+        this.resetCenter();
+        cb();
+      });
+  
+      this.setCenter(container);
+    } else {
+      this.resetCenter();
+      cb();
     }
   }
 

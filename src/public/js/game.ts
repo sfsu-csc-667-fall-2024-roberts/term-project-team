@@ -126,15 +126,17 @@ class GameService {
     if (player && typeof data.newPosition === 'number') {
       await this.updatePlayerPosition(player, data.newPosition);
       this.gameData.gameState = data.gameState;
-      
-      // Update UI
-      this.updateTurnUI();
-      
-      // If it's a bot's turn, process their actions
-      const nextPlayer = this.getNextPlayer();
-      if (nextPlayer?.is_bot) {
-        await this.processBotTurn(nextPlayer);
-      }
+
+      this.board.showBuyOption(player, async () => {
+        // Update UI
+        this.updateTurnUI();
+        
+        // If it's a bot's turn, process their actions
+        const nextPlayer = this.getNextPlayer();
+        if (nextPlayer?.is_bot) {
+          await this.processBotTurn(nextPlayer);
+        }
+      })
     }
   }
 

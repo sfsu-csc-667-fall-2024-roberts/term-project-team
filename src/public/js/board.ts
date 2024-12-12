@@ -3,6 +3,7 @@ import { Property } from './types';
 
 class MonopolyBoard {
   private container: HTMLElement;
+  private centerArea: HTMLDivElement;
   private playerTokens: Map<number, HTMLElement>;
   private propertyOwnership: Map<number, number>;
 
@@ -12,6 +13,7 @@ class MonopolyBoard {
       throw new Error(`Element with id ${containerId} not found`);
     }
     this.container = element;
+    this.centerArea = document.createElement('div');
     this.playerTokens = new Map();
     this.propertyOwnership = new Map();
     this.initializeBoard();
@@ -28,10 +30,9 @@ class MonopolyBoard {
     });
 
     // Add center area
-    const centerArea = document.createElement('div');
-    centerArea.className = 'board-center';
-    centerArea.textContent = 'MONOPOLY';
-    this.container.appendChild(centerArea);
+    this.resetCenter();
+    this.centerArea.className = 'board-center';
+    this.container.appendChild(this.centerArea);
   }
 
   private createBoardSpace(space: BoardSpace): HTMLElement {
@@ -105,6 +106,18 @@ class MonopolyBoard {
     content.appendChild(infoContainer);
     spaceElement.appendChild(content);
 
+    spaceElement.addEventListener('mouseover', () => {
+      const element = spaceElement.cloneNode(true) as HTMLDivElement;
+      element.classList.remove(`pos-${space.position}`);
+      element.classList.add('board-center-card');
+      element.getElementsByClassName('player-token')[0]?.remove();
+      this.setCenter(element);
+    })
+
+    spaceElement.addEventListener('mouseleave', () => {
+      this.resetCenter();
+    })
+
     return spaceElement;
   }
 
@@ -164,6 +177,15 @@ class MonopolyBoard {
 
       this.propertyOwnership.set(property.position, property.owner_id || -1);
     }
+  }
+
+  public setCenter(content: HTMLElement): void {
+    this.centerArea.innerHTML = "";
+    this.centerArea.appendChild(content);
+  }
+
+  public resetCenter(): void {
+    this.centerArea.innerHTML = "<div class='board-center-monopoly'>MONOPOLY</div>";
   }
 }
 

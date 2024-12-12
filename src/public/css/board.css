@@ -209,13 +209,21 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.board-center-monopoly {
   font-size: 3rem;
   font-weight: bold;
   color: #000;
   text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
   white-space: nowrap;
-  z-index: 1;
   text-align: center;
+}
+
+.board-center-card {
+  position: initial;
+  scale: 3;
 }
 
 /* Player tokens */

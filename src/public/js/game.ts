@@ -19,14 +19,19 @@ class GameService {
   private messageContainer: HTMLElement;
   private board: MonopolyBoard;
   private isProcessingBotTurn: boolean = false;
+  private statusElement: HTMLElement;
+  private playersElement: HTMLElement;
 
   constructor(gameData: GameData) {
     this.gameData = gameData;
     this.messageContainer = document.querySelector('.game-messages') as HTMLElement;
+    this.statusElement = document.querySelector('.game-status') as HTMLElement;
+    this.playersElement = document.querySelector('.players-list') as HTMLElement;
     this.board = new MonopolyBoard('monopoly-board');
     this.initializeEventListeners();
     this.initializeBoard();
-    this.checkForBotTurn(); // Check if a bot should start
+    this.updateGameStatus();
+    this.checkForBotTurn();
   }
 
   private initializeEventListeners(): void {
@@ -62,6 +67,11 @@ class GameService {
   }
 
   private async rollDice(): Promise<void> {
+    const rollDiceButton = document.getElementById('roll-dice') as HTMLButtonElement;
+    const endTurnButton = document.getElementById('end-turn') as HTMLButtonElement;
+    
+    if (rollDiceButton) rollDiceButton.disabled = true;
+
     try {
       const response = await fetch(`/game/${this.gameData.gameId}/roll`, {
         method: 'POST',
@@ -73,70 +83,90 @@ class GameService {
       if (!response.ok) {
         const error = await response.json();
         this.showMessage(error.error || 'Failed to roll dice');
+        if (rollDiceButton) rollDiceButton.disabled = false;
         return;
       }
 
       const data: RollResponse = await response.json();
       
-      // Show roll result
-      this.showMessage(`You rolled a ${data.roll}!`);
+      // Show roll result with delay
+      await this.showMessageWithDelay(`You rolled a ${data.roll}!`, 0);
 
       if (data.gameState.phase === 'waiting') {
         await this.handleInitialRollPhase(data);
       } else {
         await this.handleGameplayRoll(data);
+        if (endTurnButton) endTurnButton.disabled = false;
       }
     } catch (error) {
       console.error('Roll error:', error);
       this.showMessage('Failed to roll dice');
+      if (rollDiceButton) rollDiceButton.disabled = false;
     }
   }
 
   private async handleInitialRollPhase(data: RollResponse): Promise<void> {
-    this.showMessage(`Initial roll for turn order: ${data.roll}`);
+    await this.showMessageWithDelay(`Initial roll for turn order: ${data.roll}`, 1000);
     
-    // Hide bot rolls until human player rolls
     const currentPlayer = this.gameData.players.find((p: Player) => p.user_id === this.gameData.currentUserId);
     if (!currentPlayer) return;
 
-    const hasHumanRolled = data.gameState.dice_rolls.some((roll: { playerId: number; roll: number }) => 
-      roll.playerId === currentPlayer.id
+    // Update game state
+    this.gameData.gameState = data.gameState;
+
+    // Check if current player has already rolled
+    const hasCurrentPlayerRolled = data.gameState.dice_rolls.some(
+      (roll: { playerId: number; roll: number }) => roll.playerId === currentPlayer.id
     );
 
-    if (!hasHumanRolled) {
-      return;
+    // Re-enable roll button if player hasn't rolled yet
+    const rollDiceButton = document.getElementById('roll-dice') as HTMLButtonElement;
+    if (rollDiceButton) {
+      rollDiceButton.disabled = hasCurrentPlayerRolled;
     }
 
-    // After human rolls, trigger bot rolls
-    const botPlayers = this.gameData.players.filter((p: Player) => p.is_bot);
-    for (const bot of botPlayers) {
-      if (!data.gameState.dice_rolls.find((r: { playerId: number; roll: number }) => r.playerId === bot.id)) {
-        await this.rollForBot(bot.id);
+    // If current player just rolled, trigger bot rolls
+    if (hasCurrentPlayerRolled) {
+      // After human rolls, trigger bot rolls with delays
+      const botPlayers = this.gameData.players.filter((p: Player) => p.is_bot);
+      for (const bot of botPlayers) {
+        if (!data.gameState.dice_rolls.find((r: { playerId: number; roll: number }) => r.playerId === bot.id)) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          await this.rollForBot(bot.id);
+          
+          // Update game state after each bot roll
+          this.gameData.gameState = data.gameState;
+          this.updateGameStatus();
+        }
+      }
+
+      // Check if all players have rolled
+      if (data.gameState.dice_rolls.length === this.gameData.players.length) {
+        await this.showMessageWithDelay('Determining turn order...', 1000);
+        this.showTurnOrder(data.gameState);
+        setTimeout(() => window.location.reload(), 3000);
       }
     }
 
-    if (data.gameState.dice_rolls.length === this.gameData.players.length) {
-      this.showTurnOrder(data.gameState);
-      setTimeout(() => window.location.reload(), 2000);
-    }
+    // Update the status message
+    this.updateGameStatus();
   }
 
   private async handleGameplayRoll(data: RollResponse): Promise<void> {
     const player = this.gameData.players.find((p: Player) => p.id === this.gameData.currentPlayerId);
     if (player && typeof data.newPosition === 'number') {
+      await new Promise(resolve => setTimeout(resolve, 1000));
       await this.updatePlayerPosition(player, data.newPosition);
       this.gameData.gameState = data.gameState;
-
-      this.board.showBuyOption(player, async () => {
-        // Update UI
-        this.updateTurnUI();
-        
-        // If it's a bot's turn, process their actions
-        const nextPlayer = this.getNextPlayer();
-        if (nextPlayer?.is_bot) {
-          await this.processBotTurn(nextPlayer);
-        }
-      })
+      
+      await this.updateGameStatus();
+      await this.updatePlayersStatus();
+      
+      const nextPlayer = this.getNextPlayer();
+      if (nextPlayer?.is_bot) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await this.processBotTurn(nextPlayer);
+      }
     }
   }
 
@@ -144,19 +174,62 @@ class GameService {
     player.position = newPosition;
     const playerIndex = this.gameData.players.findIndex((p: Player) => p.id === player.id);
     await this.board.updatePlayerPosition(player.id, newPosition, playerIndex);
+    await this.updatePlayersStatus();
   }
 
-  private updateTurnUI(): void {
-    const rollDiceButton = document.getElementById('roll-dice') as HTMLButtonElement;
-    const endTurnButton = document.getElementById('end-turn') as HTMLButtonElement;
+  private async showMessageWithDelay(message: string, delay: number): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, delay));
+    this.showMessage(message);
+  }
+
+  private updateGameStatus(): void {
+    if (!this.statusElement) return;
     
-    if (rollDiceButton) rollDiceButton.disabled = true;
-    if (endTurnButton) endTurnButton.disabled = false;
+    const currentPlayer = this.getNextPlayer();
+    let statusText = '';
     
-    const nextPlayer = this.getNextPlayer();
-    if (nextPlayer) {
-      this.showMessage(`It's ${nextPlayer.username}'s turn`);
+    if (this.gameData.gameState.phase === 'waiting') {
+      statusText = 'Initial Roll Phase - Roll to determine turn order';
+      
+      // Add roll status if available
+      const rollCount = this.gameData.gameState.dice_rolls.length;
+      const totalPlayers = this.gameData.players.length;
+      if (rollCount > 0) {
+        statusText += ` (${rollCount}/${totalPlayers} players rolled)`;
+      }
+    } else {
+      statusText = `${currentPlayer?.username}'s Turn - `;
+      if (this.gameData.currentPlayerId === this.gameData.currentUserId) {
+        statusText += 'Your turn to roll!';
+      } else {
+        statusText += 'Waiting for player to take their turn...';
+      }
     }
+    
+    this.statusElement.textContent = statusText;
+  }
+
+  private updatePlayersStatus(): void {
+    if (!this.playersElement) return;
+    
+    this.gameData.players.forEach((player: Player) => {
+      const playerElement = this.playersElement.querySelector(`[data-player-id="${player.id}"]`);
+      if (playerElement) {
+        const statusElement = playerElement.querySelector('.roll-status');
+        if (statusElement) {
+          const hasRolled = this.gameData.gameState.dice_rolls.some(
+            (roll: { playerId: number; roll: number }) => roll.playerId === player.id
+          );
+          
+          if (this.gameData.gameState.phase === 'waiting') {
+            statusElement.textContent = hasRolled ? 'Rolled' : 'Waiting for roll...';
+          } else {
+            statusElement.textContent = player.id === this.gameData.currentPlayerId ? 
+              'Current turn' : 'Waiting for turn...';
+          }
+        }
+      }
+    });
   }
 
   private async processBotTurn(bot: Player): Promise<void> {
@@ -248,12 +321,16 @@ class GameService {
 
       const data: RollResponse = await response.json();
       const bot = this.gameData.players.find((p: Player) => p.id === botId);
-      this.showMessage(`${bot?.username || 'Bot'} rolled a ${data.roll}!`);
+      await this.showMessageWithDelay(`${bot?.username || 'Bot'} rolled a ${data.roll}!`, 1000);
 
       if (data.gameState.phase === 'playing' && typeof data.newPosition === 'number') {
         const playerIndex = this.gameData.players.findIndex((p: Player) => p.id === botId);
         await this.board.updatePlayerPosition(botId, data.newPosition, playerIndex);
       }
+
+      // Update game state
+      this.gameData.gameState = data.gameState;
+      this.updateGameStatus();
     } catch (error) {
       console.error('Bot roll error:', error);
       this.showMessage('Failed to roll for bot');

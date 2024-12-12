@@ -1,12 +1,12 @@
 import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
-import { ApiError, Player, Property, PurchaseResponse } from './types';
+import { Property } from './types';
 
 class MonopolyBoard {
   private container: HTMLElement;
-  private centerArea: HTMLDivElement;
   private playerTokens: Map<number, HTMLElement>;
   private propertyOwnership: Map<number, number>;
-  private promptBuying: boolean;
+  private playerColors = ['#90EE90', '#FFB6C1', '#87CEEB', '#DDA0DD'];
+  private currentPlayerId: number;
 
   constructor(containerId: string) {
     const element = document.getElementById(containerId);
@@ -14,10 +14,8 @@ class MonopolyBoard {
       throw new Error(`Element with id ${containerId} not found`);
     }
     this.container = element;
-    this.centerArea = document.createElement('div');
     this.playerTokens = new Map();
     this.propertyOwnership = new Map();
-    this.promptBuying = false;
     this.initializeBoard();
   }
 
@@ -32,14 +30,16 @@ class MonopolyBoard {
     });
 
     // Add center area
-    this.resetCenter();
-    this.centerArea.className = 'board-center';
-    this.container.appendChild(this.centerArea);
+    const centerArea = document.createElement('div');
+    centerArea.className = 'board-center';
+    centerArea.textContent = 'MONOPOLY';
+    this.container.appendChild(centerArea);
   }
 
   private createBoardSpace(space: BoardSpace): HTMLElement {
     const spaceElement = document.createElement('div');
     spaceElement.className = `board-space pos-${space.position}`;
+    spaceElement.setAttribute('data-position', space.position.toString());
     
     // Add type-specific classes
     if (space.type === 'property') {
@@ -108,65 +108,66 @@ class MonopolyBoard {
     content.appendChild(infoContainer);
     spaceElement.appendChild(content);
 
-    spaceElement.addEventListener('mouseover', () => {
-      if (!this.promptBuying) {
-        const element = spaceElement.cloneNode(true) as HTMLDivElement;
-        element.classList.remove(`pos-${space.position}`);
-        element.classList.add('board-center-card');
-        element.getElementsByClassName('player-token')[0]?.remove();
-        this.setCenter(element);
-      }
-    })
-
-    spaceElement.addEventListener('mouseleave', () => {
-      if (!this.promptBuying) {
-        this.resetCenter();
-      }
-    })
-
     return spaceElement;
   }
 
-  public updatePlayerPosition(playerId: number, position: number, playerIndex: number): Promise<void> {
-    return new Promise(resolve => {
-      // Remove existing token if any
-      const existingToken = this.playerTokens.get(playerId);
-      if (existingToken) {
-        existingToken.remove();
-      }
-
-      // Create new token
-      const token = document.createElement('div');
+  public updatePlayerPosition(playerId: number, position: number, playerIndex: number): void {
+    let token = this.playerTokens.get(playerId);
+    
+    // Create token if it doesn't exist
+    if (!token) {
+      token = document.createElement('div');
       token.className = 'player-token';
-      token.classList.add(`player-${playerIndex}`);
+      token.style.backgroundColor = this.playerColors[playerIndex % this.playerColors.length];
+      token.style.width = '20px';
+      token.style.height = '20px';
+      token.style.borderRadius = '50%';
+      token.style.position = 'absolute';
+      token.style.zIndex = '100';
+      token.style.transition = 'all 0.5s ease-in-out';
+      token.style.border = '2px solid white';
+      token.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+      this.container.appendChild(token);
+      this.playerTokens.set(playerId, token);
+    }
 
-      // Find the target space
-      const targetSpace = this.container.querySelector(`.pos-${position}`) as HTMLElement;
-      if (targetSpace) {
-        // Calculate center position of the space
-        const rect = targetSpace.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        
-        token.style.left = `${centerX}px`;
-        token.style.top = `${centerY}px`;
-        
-        targetSpace.appendChild(token);
-        this.playerTokens.set(playerId, token);
-      }
+    const space = this.container.querySelector(`[data-position="${position}"]`) as HTMLElement;
+    if (!space) return;
 
-      // Add animation class for movement
-      token.classList.add('token-move');
+    const spaceRect = space.getBoundingClientRect();
+    const boardRect = this.container.getBoundingClientRect();
 
-      // Remove animation class after animation completes
-      setTimeout(() => {
-        token.classList.remove('token-move');
-        resolve();
-      }, 500);
-    });
+    // Calculate relative position within the board
+    const relativeX = spaceRect.left - boardRect.left + (spaceRect.width / 2) - 10;
+    const relativeY = spaceRect.top - boardRect.top + (spaceRect.height / 2) - 10;
+
+    // Add offset based on player index to prevent overlap
+    const offset = playerIndex * 15;
+    const isCorner = position % 10 === 0;
+    
+    if (isCorner) {
+      // For corner spaces, arrange tokens in a 2x2 grid
+      const row = Math.floor(playerIndex / 2);
+      const col = playerIndex % 2;
+      token.style.left = `${relativeX + (col * 20)}px`;
+      token.style.top = `${relativeY + (row * 20)}px`;
+    } else {
+      // For regular spaces, arrange tokens horizontally with slight vertical offset
+      token.style.left = `${relativeX + offset}px`;
+      token.style.top = `${relativeY + (playerIndex * 5)}px`;
+    }
+
+    // Highlight current player's token
+    if (this.currentPlayerId === playerId) {
+      token.style.transform = 'scale(1.2)';
+      token.style.boxShadow = '0 0 10px rgba(255,255,0,0.5)';
+    } else {
+      token.style.transform = 'scale(1)';
+      token.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+    }
   }
 
-  public updatePropertyOwnership(property: Property, playerIndex: number): void {
+  public updatePropertyOwnership(property: Property, ownerIndex: number): void {
     const spaceElement = this.container.querySelector(`.pos-${property.position}`) as HTMLElement;
     if (spaceElement) {
       // Remove any existing ownership indicators
@@ -177,103 +178,12 @@ class MonopolyBoard {
 
       if (property.owner_id !== null && property.owner_id !== undefined) {
         const indicator = document.createElement('div');
-        indicator.className = `property-owner-indicator owner-${playerIndex}`;
+        indicator.className = `property-owner-indicator owner-${ownerIndex}`;
         spaceElement.appendChild(indicator);
       }
 
       this.propertyOwnership.set(property.position, property.owner_id || -1);
     }
-  }
-
-  public showBuyOption(player: Player, cb: () => void): void {
-    const position = player.position;
-    const ownedProperty = this.propertyOwnership.get(position);
-    const property = BOARD_SPACES[position];
-    if (ownedProperty !== undefined) {
-      // TODO: Implement rent logic
-      cb();
-    } else if (property.price && player.balance >= property.price) {
-      this.promptBuying = true;
-
-      const container = document.createElement('div');
-      container.className = 'board-center-prompt';
-
-      // board card
-      const targetSpace = this.container.querySelector(`.pos-${position}`) as HTMLElement;
-      const element = targetSpace.cloneNode(true) as HTMLDivElement;
-      element.classList.remove(`pos-${position}`);
-      element.classList.add('board-center-card');
-      element.getElementsByClassName('player-token')[0]?.remove();
-      const card = document.createElement('div');
-      card.className = 'board-center-card-wrapper';
-      card.appendChild(element);
-      container.appendChild(card);
-
-      // buttons
-      const buttons = document.createElement('div');
-      buttons.className = 'board-center-options';
-      const buy = document.createElement('button');
-      buy.className = 'btn btn-primary';
-      buy.innerText = 'Buy'
-      const skip = document.createElement('button');
-      skip.className = 'btn btn-secondary';
-      skip.innerText = 'Skip'
-      buttons.appendChild(buy);
-      buttons.appendChild(skip)
-      container.appendChild(buttons);
-  
-      // FIXME: Not working at the moment
-      buy.addEventListener('click', async () => {
-        try {
-          const response = await fetch(`/game/${window.gameData.gameId}/properties/${position}/buy`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-
-          const data = await response.json();
-
-          if (!response.ok) {
-            const errorData = data as ApiError;
-            throw new Error(errorData.error || 'Failed to purchase property');
-          }
-
-          const purchaseData = data as PurchaseResponse;
-
-          // Update player's balance
-          player.balance = purchaseData.playerBalance;
-
-          // Update property ownership display
-          this.updatePropertyOwnership(purchaseData.property, player.id);
-        } catch (error) {
-          console.error('Purchase error:', error);
-        } finally {
-          this.resetCenter();
-          cb();
-        }
-      });
-
-      skip.addEventListener('click', () => {
-        this.promptBuying = false;
-        this.resetCenter();
-        cb();
-      });
-  
-      this.setCenter(container);
-    } else {
-      this.resetCenter();
-      cb();
-    }
-  }
-
-  public setCenter(content: HTMLElement): void {
-    this.centerArea.innerHTML = "";
-    this.centerArea.appendChild(content);
-  }
-
-  public resetCenter(): void {
-    this.centerArea.innerHTML = "<div class='board-center-monopoly'>MONOPOLY</div>";
   }
 }
 

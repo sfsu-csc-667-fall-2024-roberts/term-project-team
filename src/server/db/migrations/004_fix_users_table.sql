@@ -17,6 +17,7 @@ CREATE TABLE games (
   id SERIAL PRIMARY KEY,
   owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   status VARCHAR(50) NOT NULL DEFAULT 'waiting',
+  game_state JSONB DEFAULT '{"phase": "waiting", "current_player_index": 0, "dice_rolls": [], "turn_order": []}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   CHECK (status IN ('waiting', 'in-progress', 'finished'))
@@ -32,6 +33,9 @@ CREATE TABLE players (
   position INTEGER NOT NULL DEFAULT 0,
   jailed BOOLEAN NOT NULL DEFAULT FALSE,
   is_bot BOOLEAN NOT NULL DEFAULT FALSE,
+  bot_strategy VARCHAR(50) CHECK (bot_strategy IN ('aggressive', 'conservative', 'balanced') OR bot_strategy IS NULL),
+  bot_difficulty VARCHAR(20) CHECK (bot_difficulty IN ('easy', 'medium', 'hard') OR bot_difficulty IS NULL),
+  turn_order INTEGER,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 ); 

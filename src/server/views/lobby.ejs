@@ -110,7 +110,7 @@
                     <span class="detail-icon">👥</span>
                     <span class="detail-text">
                       <%= game.human_count %> human<%= game.human_count !== 1 ? 's' : '' %>, 
-                      <%= game.total_players - game.human_count %> bot<%= (game.total_players - game.human_count) !== 1 ? 's' : '' %>
+                      <%= game.bot_count %> bot<%= game.bot_count !== 1 ? 's' : '' %>
                     </span>
                   </div>
                   <div class="total-players">

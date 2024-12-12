@@ -5,6 +5,7 @@ class MonopolyBoard {
   private container: HTMLElement;
   private playerTokens: Map<number, HTMLElement>;
   private propertyOwnership: Map<number, number>;
+  private playerColors = ['#90EE90', '#FFB6C1', '#87CEEB', '#DDA0DD'];
 
   constructor(containerId: string) {
     const element = document.getElementById(containerId);
@@ -37,6 +38,7 @@ class MonopolyBoard {
   private createBoardSpace(space: BoardSpace): HTMLElement {
     const spaceElement = document.createElement('div');
     spaceElement.className = `board-space pos-${space.position}`;
+    spaceElement.setAttribute('data-position', space.position.toString());
     
     // Add type-specific classes
     if (space.type === 'property') {
@@ -108,46 +110,52 @@ class MonopolyBoard {
     return spaceElement;
   }
 
-  public updatePlayerPosition(playerId: number, position: number, playerIndex: number): Promise<void> {
-    return new Promise(resolve => {
-      // Remove existing token if any
-      const existingToken = this.playerTokens.get(playerId);
-      if (existingToken) {
-        existingToken.remove();
-      }
-
-      // Create new token
-      const token = document.createElement('div');
+  public updatePlayerPosition(playerId: number, position: number, playerIndex: number): void {
+    let token = this.playerTokens.get(playerId);
+    
+    // Create token if it doesn't exist
+    if (!token) {
+      token = document.createElement('div');
       token.className = 'player-token';
-      token.classList.add(`player-${playerIndex}`);
+      token.style.backgroundColor = this.playerColors[playerIndex % this.playerColors.length];
+      token.style.width = '20px';
+      token.style.height = '20px';
+      token.style.borderRadius = '50%';
+      token.style.position = 'absolute';
+      token.style.zIndex = '100';
+      token.style.transition = 'all 0.5s ease-in-out';
+      this.container.appendChild(token);
+      this.playerTokens.set(playerId, token);
+    }
 
-      // Find the target space
-      const targetSpace = this.container.querySelector(`.pos-${position}`) as HTMLElement;
-      if (targetSpace) {
-        // Calculate center position of the space
-        const rect = targetSpace.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        
-        token.style.left = `${centerX}px`;
-        token.style.top = `${centerY}px`;
-        
-        targetSpace.appendChild(token);
-        this.playerTokens.set(playerId, token);
-      }
+    const space = this.container.querySelector(`[data-position="${position}"]`) as HTMLElement;
+    if (!space) return;
 
-      // Add animation class for movement
-      token.classList.add('token-move');
+    const spaceRect = space.getBoundingClientRect();
+    const boardRect = this.container.getBoundingClientRect();
 
-      // Remove animation class after animation completes
-      setTimeout(() => {
-        token.classList.remove('token-move');
-        resolve();
-      }, 500);
-    });
+    // Calculate relative position within the board
+    const relativeX = spaceRect.left - boardRect.left + (spaceRect.width / 2) - 10;
+    const relativeY = spaceRect.top - boardRect.top + (spaceRect.height / 2) - 10;
+
+    // Add offset based on player index to prevent overlap
+    const offset = playerIndex * 15;
+    const isCorner = position % 10 === 0;
+    
+    if (isCorner) {
+      // For corner spaces, arrange tokens in a 2x2 grid
+      const row = Math.floor(playerIndex / 2);
+      const col = playerIndex % 2;
+      token.style.left = `${relativeX + (col * 20)}px`;
+      token.style.top = `${relativeY + (row * 20)}px`;
+    } else {
+      // For regular spaces, arrange tokens horizontally
+      token.style.left = `${relativeX + offset}px`;
+      token.style.top = `${relativeY}px`;
+    }
   }
 
-  public updatePropertyOwnership(property: Property, playerIndex: number): void {
+  public updatePropertyOwnership(property: Property, ownerIndex: number): void {
     const spaceElement = this.container.querySelector(`.pos-${property.position}`) as HTMLElement;
     if (spaceElement) {
       // Remove any existing ownership indicators
@@ -158,7 +166,7 @@ class MonopolyBoard {
 
       if (property.owner_id !== null && property.owner_id !== undefined) {
         const indicator = document.createElement('div');
-        indicator.className = `property-owner-indicator owner-${playerIndex}`;
+        indicator.className = `property-owner-indicator owner-${ownerIndex}`;
         spaceElement.appendChild(indicator);
       }
 

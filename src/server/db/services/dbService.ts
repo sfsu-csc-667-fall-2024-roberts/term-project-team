@@ -156,7 +156,13 @@ export async function addPlayerToGame(gameId: number, userId: number): Promise<P
 
 export async function getGamePlayers(gameId: number): Promise<Player[]> {
   const result = await pool.query(
-    'SELECT * FROM players WHERE game_id = $1 ORDER BY id ASC',
+    `SELECT 
+      p.*,
+      COALESCE(u.username, p.username) as username
+    FROM players p
+    LEFT JOIN users u ON p.user_id = u.id
+    WHERE p.game_id = $1 
+    ORDER BY p.id ASC`,
     [gameId]
   );
   return result.rows;
@@ -398,18 +404,30 @@ export async function createBotPlayer(
     // Generate bot name based on strategy and difficulty
     const botName = BotService.generateBotName(strategy, difficulty);
 
+    // Check if game exists and has space
+    const gameResult = await client.query(
+      'SELECT COUNT(p.id) as player_count FROM games g LEFT JOIN players p ON g.id = p.game_id WHERE g.id = $1',
+      [gameId]
+    );
+
+    if (!gameResult.rows[0] || gameResult.rows[0].player_count >= 4) {
+      throw new Error('Game is full or does not exist');
+    }
+
+    // Create bot player
     const result = await client.query(
       `INSERT INTO players (
-        game_id, 
-        is_bot, 
-        username, 
-        balance, 
+        game_id,
+        user_id,
+        username,
+        is_bot,
+        balance,
         position,
         bot_strategy,
         bot_difficulty
-      ) VALUES ($1, true, $2, 1500, 0, $3, $4)
+      ) VALUES ($1, NULL, $2, true, $3, $4, $5, $6)
       RETURNING *`,
-      [gameId, botName, strategy, difficulty]
+      [gameId, botName, 1500, 0, strategy, difficulty]
     );
 
     await client.query('COMMIT');
@@ -468,9 +486,16 @@ export async function getGames(): Promise<any[]> {
   await cleanupStaleGames();
   
   const result = await pool.query(`
-    SELECT g.*, 
-           COUNT(p.id) filter (where not p.is_bot) as human_count,
-           COUNT(p.id) as total_players
+    SELECT 
+      g.*,
+      COUNT(p.id) as total_players,
+      COUNT(p.id) filter (where not p.is_bot) as human_count,
+      COUNT(p.id) filter (where p.is_bot) as bot_count,
+      json_agg(json_build_object(
+        'id', p.id,
+        'username', p.username,
+        'is_bot', p.is_bot
+      )) as players
     FROM games g
     LEFT JOIN players p ON g.id = p.game_id
     WHERE g.status = 'waiting'

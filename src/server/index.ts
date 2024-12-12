@@ -26,6 +26,12 @@ app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Add request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
 // Session setup
 const PgSession = connectPgSimple(session);
 app.use(
@@ -59,64 +65,71 @@ if (process.env.NODE_ENV !== "production") {
   const livereload = require("livereload");
   const connectLivereload = require("connect-livereload");
   
-  // Try to create LiveReload server with fallback ports
-  const tryCreateLiveReloadServer = async (startPort: number, maxAttempts: number = 10): Promise<void> => {
-    try {
-      console.log('Skipping LiveReload server for testing');
-      // Commented out for testing
-      /*
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const port = startPort + attempt;
-        try {
-          const liveReloadServer = livereload.createServer({
-            port,
-            delay: 0,
-            protocol: 'http',
-            usePolling: true,
-            exts: ['html', 'css', 'js', 'ts', 'ejs'],
-            exclusions: [/node_modules/],
-            errorListener: (err: any) => {
-              console.error('LiveReload error:', err);
-            }
-          });
+  // Create LiveReload server with dynamic port
+  const startLiveReload = () => {
+    // Use a different port range to avoid conflicts
+    let port = 45729;
+    const maxAttempts = 10;
 
-          liveReloadServer.watch(staticPath);
-          console.log(`LiveReload server started on port ${port}`);
-          return;
-        } catch (error: any) {
-          if (error.code === 'EADDRINUSE') {
-            console.warn(`LiveReload port ${port} is in use, trying next port...`);
-            continue;
-          }
-          console.error('Failed to start LiveReload server:', error);
-          break;
-        }
+    const tryPort = (attempt = 0) => {
+      if (attempt >= maxAttempts) {
+        console.log('Could not find available port for LiveReload, continuing without it');
+        return;
       }
-      */
-    } catch (error) {
-      console.warn('Could not start LiveReload server:', error);
-    }
+
+      const server = livereload.createServer({
+        port: port + attempt,
+        delay: 0,
+        protocol: 'http',
+        usePolling: true,
+        exts: ['html', 'css', 'js', 'ts', 'ejs'],
+        exclusions: [/node_modules/]
+      }, () => {
+        console.log(`LiveReload server started on port ${port + attempt}`);
+      });
+
+      server.server.on('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+          console.log(`Port ${port + attempt} in use, trying next port...`);
+          tryPort(attempt + 1);
+        } else {
+          console.error('LiveReload error:', err);
+        }
+      });
+
+      server.server.on('listening', () => {
+        const actualPort = (server.server.address() as any).port;
+        
+        // Configure middleware with the working port
+        app.use(connectLivereload({
+          port: actualPort,
+          src: `http://localhost:${actualPort}/livereload.js?snipver=1`
+        }));
+
+        // Add CSP headers
+        app.use((_req, res, next) => {
+          res.setHeader(
+            "Content-Security-Policy",
+            "default-src 'self'; " +
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*; " +
+            "style-src 'self' 'unsafe-inline' 'unsafe-hashes'; " +
+            "img-src 'self' data: https:; " +
+            "font-src 'self' data:; " +
+            `connect-src 'self' ws://localhost:${actualPort} http://localhost:*; ` +
+            "base-uri 'self';"
+          );
+          next();
+        });
+      });
+
+      server.watch(staticPath);
+    };
+
+    tryPort();
   };
 
-  // Start with a high port number to avoid conflicts
-  tryCreateLiveReloadServer(35729);
-  
-  // Add CSP headers for development
-  app.use((_req, res, next) => {
-    res.setHeader(
-      "Content-Security-Policy",
-      "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*; " +
-      "style-src 'self' 'unsafe-inline' 'unsafe-hashes'; " +
-      "img-src 'self' data: https:; " +
-      "font-src 'self' data:; " +
-      "connect-src 'self' ws://localhost:*; " +
-      "base-uri 'self';"
-    );
-    next();
-  });
-  
-  app.use(connectLivereload());
+  // Start LiveReload
+  startLiveReload();
 }
 
 // Routes

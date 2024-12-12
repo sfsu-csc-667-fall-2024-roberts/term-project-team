@@ -6,7 +6,7 @@ class MonopolyBoard {
   private playerTokens: Map<number, HTMLElement>;
   private propertyOwnership: Map<number, number>;
   private playerColors = ['#90EE90', '#FFB6C1', '#87CEEB', '#DDA0DD'];
-  private currentPlayerId: number | null = null;
+  private currentPlayerId: number = -1;
 
   constructor(containerId: string) {
     const element = document.getElementById(containerId);
@@ -188,7 +188,7 @@ class MonopolyBoard {
 
   public setCurrentPlayer(playerId: number): void {
     this.currentPlayerId = playerId;
-    // Update token highlights
+    // Update token highlighting for all players
     this.playerTokens.forEach((token, tokenPlayerId) => {
       if (tokenPlayerId === playerId) {
         token.style.transform = 'scale(1.2)';

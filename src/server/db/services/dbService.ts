@@ -627,8 +627,7 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
     }
 
     // Calculate rent based on property state
-    const baseRent: number = boardSpace.rent[0];
-    const rentAmount: number = baseRent * (property.house_count + 1);
+    const rentAmount: number = boardSpace.rent[Math.min(property.house_count, boardSpace.rent.length - 1)];
 
     // Check if player can afford rent
     if (player.balance < rentAmount) {

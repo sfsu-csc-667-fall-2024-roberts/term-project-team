@@ -5,10 +5,7 @@ import path from 'path';
 async function runMigrations() {
   try {
     // Read the migration files
-    const migrationFiles = [
-      '001_create_tables.sql',
-      '002_create_session_table.sql'
-    ];
+    const migrationFiles = fs.readdirSync(__dirname).filter(file => file.endsWith('.sql'));
 
     // Run the migrations within a transaction
     await pool.query('BEGIN');

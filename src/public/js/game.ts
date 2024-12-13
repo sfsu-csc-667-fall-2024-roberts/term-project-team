@@ -693,8 +693,15 @@ class GameService {
   }
 
   private updateBoard(): void {
+    console.log('=== Updating Board ===');
     // Update player positions
     this.gameData.players.forEach((player: Player, index: number) => {
+      console.log('Updating position for player:', {
+        id: player.id,
+        username: player.username,
+        position: player.position,
+        index
+      });
       this.board.updatePlayerPosition(player.id, player.position, index);
     });
 
@@ -707,6 +714,7 @@ class GameService {
         }
       }
     });
+    console.log('=== Board Update Complete ===');
   }
 
   private checkForBotTurn(): void {

@@ -1,6 +1,6 @@
 import { pool } from '../config';
 import { User, Game, Player, Property } from '../models/types';
-import { BOARD_SPACES, BoardSpace } from '../../../shared/boardData';
+import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
 import { BotService } from '../../services/botService';
 
 type BotStrategy = 'aggressive' | 'conservative' | 'balanced';
@@ -87,11 +87,21 @@ export async function createGame(ownerId: number): Promise<Game> {
 }
 
 export async function getGame(gameId: number): Promise<Game | null> {
-  const result = await pool.query(
-    'SELECT * FROM games WHERE id = $1',
-    [gameId]
-  );
-  return result.rows[0] || null;
+  if (!gameId || isNaN(gameId)) {
+    console.error('Invalid game ID:', gameId);
+    return null;
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM games WHERE id = $1',
+      [gameId]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error getting game:', error);
+    throw error;
+  }
 }
 
 export async function listGames(): Promise<(Game & { owner_username: string; player_count: number })[]> {
@@ -155,11 +165,21 @@ export async function addPlayerToGame(gameId: number, userId: number): Promise<P
 }
 
 export async function getGamePlayers(gameId: number): Promise<Player[]> {
-  const result = await pool.query(
-    'SELECT * FROM players WHERE game_id = $1 ORDER BY id ASC',
-    [gameId]
-  );
-  return result.rows;
+  if (!gameId || isNaN(gameId)) {
+    console.error('Invalid game ID for players:', gameId);
+    return [];
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM players WHERE game_id = $1 ORDER BY id',
+      [gameId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error getting game players:', error);
+    throw error;
+  }
 }
 
 export async function updatePlayerState(
@@ -215,11 +235,21 @@ export async function createProperty(
 }
 
 export async function getGameProperties(gameId: number): Promise<Property[]> {
-  const result = await pool.query(
-    'SELECT * FROM properties WHERE game_id = $1 ORDER BY position ASC',
-    [gameId]
-  );
-  return result.rows;
+  if (!gameId || isNaN(gameId)) {
+    console.error('Invalid game ID for properties:', gameId);
+    return [];
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM properties WHERE game_id = $1 ORDER BY position',
+      [gameId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error getting game properties:', error);
+    throw error;
+  }
 }
 
 export async function updatePropertyState(
@@ -398,18 +428,30 @@ export async function createBotPlayer(
     // Generate bot name based on strategy and difficulty
     const botName = BotService.generateBotName(strategy, difficulty);
 
+    // Check if game exists and has space
+    const gameResult = await client.query(
+      'SELECT COUNT(p.id) as player_count FROM games g LEFT JOIN players p ON g.id = p.game_id WHERE g.id = $1',
+      [gameId]
+    );
+
+    if (!gameResult.rows[0] || gameResult.rows[0].player_count >= 4) {
+      throw new Error('Game is full or does not exist');
+    }
+
+    // Create bot player
     const result = await client.query(
       `INSERT INTO players (
-        game_id, 
-        is_bot, 
-        username, 
-        balance, 
+        game_id,
+        user_id,
+        username,
+        is_bot,
+        balance,
         position,
         bot_strategy,
         bot_difficulty
-      ) VALUES ($1, true, $2, 1500, 0, $3, $4)
+      ) VALUES ($1, NULL, $2, true, $3, $4, $5, $6)
       RETURNING *`,
-      [gameId, botName, strategy, difficulty]
+      [gameId, botName, 1500, 0, strategy, difficulty]
     );
 
     await client.query('COMMIT');
@@ -468,9 +510,16 @@ export async function getGames(): Promise<any[]> {
   await cleanupStaleGames();
   
   const result = await pool.query(`
-    SELECT g.*, 
-           COUNT(p.id) filter (where not p.is_bot) as human_count,
-           COUNT(p.id) as total_players
+    SELECT 
+      g.*,
+      COUNT(p.id) as total_players,
+      COUNT(p.id) filter (where not p.is_bot) as human_count,
+      COUNT(p.id) filter (where p.is_bot) as bot_count,
+      json_agg(json_build_object(
+        'id', p.id,
+        'username', p.username,
+        'is_bot', p.is_bot
+      )) as players
     FROM games g
     LEFT JOIN players p ON g.id = p.game_id
     WHERE g.status = 'waiting'
@@ -609,7 +658,7 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
 
     // Get the property details from board data
     const boardSpace = BOARD_SPACES[propertyPosition];
-    if (!boardSpace || boardSpace.type !== 'property' || typeof boardSpace.rent !== 'object') {
+    if (!boardSpace || boardSpace.type !== 'property' || typeof boardSpace.rent !== 'number') {
       throw new Error('Invalid property position');
     }
 
@@ -627,7 +676,11 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
     }
 
     // Calculate rent based on property state
-    const rentAmount: number = boardSpace.rent[Math.min(property.house_count, boardSpace.rent.length - 1)];
+    const baseRent: number = boardSpace.rent;
+    let rentAmount: number = baseRent;
+    if (property.house_count > 0) {
+      rentAmount = baseRent * (property.house_count + 1);
+    }
 
     // Check if player can afford rent
     if (player.balance < rentAmount) {

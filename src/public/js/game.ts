@@ -452,51 +452,79 @@ class GameService {
   }
 
   private async processBotTurn(bot: Player): Promise<void> {
-    if (this.isProcessingBotTurn) return;
+    console.log('=== Processing Bot Turn Started ===');
+    console.log('Bot:', bot);
+
+    if (this.isProcessingBotTurn) {
+      console.log('Already processing a bot turn, skipping');
+      return;
+    }
+    
     this.isProcessingBotTurn = true;
 
     try {
       // Roll dice
+      console.log('Rolling for bot...');
       await new Promise(resolve => setTimeout(resolve, 1000));
       await this.rollForBot(bot.id);
 
       // Make property decisions
+      console.log('Making bot decisions...');
       await new Promise(resolve => setTimeout(resolve, 1000));
       await this.makeBotDecisions(bot);
 
       // End turn
+      console.log('Ending bot turn...');
       await new Promise(resolve => setTimeout(resolve, 1000));
       await this.endBotTurn(bot);
+    } catch (error) {
+      console.error('Bot turn error:', error);
+      this.showMessage(`${bot.username} encountered an error during their turn`);
     } finally {
       this.isProcessingBotTurn = false;
+      console.log('=== Processing Bot Turn Completed ===');
     }
   }
 
   private async makeBotDecisions(bot: Player): Promise<void> {
+    console.log('=== Making Bot Decisions Started ===');
+    console.log('Bot:', bot);
+    
     try {
       const response = await fetch(`/game/${this.gameData.gameId}/bot/${bot.id}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
 
+      console.log('Bot decision response status:', response.status);
+
       if (!response.ok) {
         throw new Error('Failed to process bot action');
       }
 
       const data: BotActionResponse = await response.json();
+      console.log('Bot decision response:', data);
+      
       this.showMessage(`${bot.username} ${data.message}`);
       
       if (data.gameState) {
         this.gameData.gameState = data.gameState;
         this.updateBoard();
+        this.updateGameStatus();
+        this.updatePlayersStatus();
       }
     } catch (error) {
       console.error('Bot decision error:', error);
       this.showMessage(`${bot.username} encountered an error`);
+    } finally {
+      console.log('=== Making Bot Decisions Completed ===');
     }
   }
 
   private async endBotTurn(bot: Player): Promise<void> {
+    console.log('=== Ending Bot Turn Started ===');
+    console.log('Bot:', bot);
+    
     try {
       const response = await fetch(`/game/${this.gameData.gameId}/end-turn`, {
         method: 'POST',
@@ -504,21 +532,38 @@ class GameService {
         body: JSON.stringify({ playerId: bot.id })
       });
 
+      console.log('End bot turn response status:', response.status);
+
       if (!response.ok) {
         throw new Error('Failed to end bot turn');
       }
 
       const data = await response.json();
+      console.log('End bot turn response:', data);
+      
       this.gameData.gameState = data.gameState;
+      if (data.players) {
+        this.gameData.players = data.players;
+      }
+      
       this.updateBoard();
+      this.updateGameStatus();
+      this.updatePlayersStatus();
 
       // Process next bot if it's their turn
       const nextPlayer = this.getNextPlayer();
+      console.log('Next player after bot turn:', nextPlayer);
+      
       if (nextPlayer?.is_bot) {
+        console.log('Next player is also a bot, processing their turn...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await this.processBotTurn(nextPlayer);
       }
     } catch (error) {
       console.error('End bot turn error:', error);
+      this.showMessage(`Failed to end ${bot.username}'s turn`);
+    } finally {
+      console.log('=== Ending Bot Turn Completed ===');
     }
   }
 
@@ -726,6 +771,9 @@ class GameService {
 
   private async endTurn(): Promise<void> {
     try {
+      console.log('=== End Turn Started ===');
+      console.log('Current game state:', this.gameData.gameState);
+      
       const response = await fetch(`/game/${this.gameData.gameId}/end-turn`, {
         method: 'POST',
         headers: {
@@ -741,14 +789,31 @@ class GameService {
       }
 
       const data = await response.json();
+      console.log('End turn response:', data);
+      
+      // Update game state
       this.gameData.gameState = data.gameState;
+      if (data.players) {
+        this.gameData.players = data.players;
+      }
+      
+      // Update UI
       this.updateBoard();
+      this.updateGameStatus();
+      this.updatePlayersStatus();
 
-      // Process next bot if it's their turn
+      // Get next player
       const nextPlayer = this.getNextPlayer();
+      console.log('Next player:', nextPlayer);
+
+      // If next player is a bot, process their turn after a short delay
       if (nextPlayer?.is_bot) {
+        console.log('Next player is a bot, processing their turn...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await this.processBotTurn(nextPlayer);
       }
+
+      console.log('=== End Turn Completed ===');
     } catch (error) {
       console.error('End turn error:', error);
       this.showMessage('Failed to end turn');

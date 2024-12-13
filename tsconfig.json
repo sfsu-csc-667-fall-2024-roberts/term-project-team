@@ -1,12 +1,29 @@
 {
   "compilerOptions": {
-    "allowSyntheticDefaultImports": true, 
-    "moduleResolution": "node", 
+    "target": "es6",
     "module": "commonjs",
-    "target": "es2016",
-    "esModuleInterop": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
     "strict": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  }
+    "forceConsistentCasingInFileNames": true,
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types",
+      "./src/server/types"
+    ],
+    "types": [
+      "node",
+      "express",
+      "express-session"
+    ]
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts"
+  ]
 }

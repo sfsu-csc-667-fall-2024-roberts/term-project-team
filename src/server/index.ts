@@ -1,183 +1,139 @@
-import dotenv from "dotenv";
-import express from "express";
-import httpErrors from "http-errors";
-import path from "path";
-import morgan from "morgan";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import { pool } from "./db/config";
-import { addUserToLocals } from "./middleware/auth";
-import * as routes from "./routes";
-import authRoutes from "./routes/auth";
-import lobbyRoutes from "./routes/lobby";
-import gameRoutes from "./routes/game";
+import express from 'express';
+import session from 'express-session';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import livereload from 'livereload';
+import connectLivereload from 'connect-livereload';
+import { pool } from './db/config';
+import authRoutes from './routes/auth';
+import gameRoutes from './routes/game';
+import lobbyRoutes from './routes/lobby';
+import { addUserToLocals } from './middleware';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-dotenv.config();
+const execAsync = promisify(exec);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// View engine setup
-app.set("views", path.join(process.cwd(), "src", "server", "views"));
-app.set("view engine", "ejs");
-
-// Middleware
-app.use(morgan("dev"));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Add request logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  next();
-});
-
-// Session setup
-const PgSession = connectPgSimple(session);
-app.use(
-  session({
-    store: new PgSession({
-      pool,
-      tableName: "session",
-      createTableIfMissing: true
-    }),
-    secret: process.env.SESSION_SECRET || "your_session_secret",
-    resave: true,
-    saveUninitialized: true,
-    cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      secure: false, // Set to false for development
-      httpOnly: true,
-      sameSite: 'lax'
-    }
-  })
-);
-
-// Add user data to response locals
-app.use(addUserToLocals);
-
-// Static files
-const staticPath = path.join(process.cwd(), "public");
-app.use(express.static(staticPath));
-
-// LiveReload setup in development
-if (process.env.NODE_ENV !== "production") {
-  const livereload = require("livereload");
-  const connectLivereload = require("connect-livereload");
-  
-  // Create LiveReload server with dynamic port
-  const startLiveReload = async () => {
-    const basePort = 35729; // Default LiveReload port
-    const maxPort = 35739; // Try up to 10 ports
-    let currentPort = basePort;
-
-    // Kill any existing LiveReload processes
-    try {
-      const { execSync } = require('child_process');
-      console.log('Checking for existing LiveReload processes...');
-      const cmd = process.platform === 'win32' 
-        ? `FOR /F "tokens=5" %P IN ('netstat -a -n -o ^| findstr :35729') DO TaskKill /PID %P /F /T` 
-        : `lsof -ti:35729 | xargs kill -9`;
-      execSync(cmd, { stdio: 'ignore' });
-      console.log('Cleaned up existing LiveReload processes');
-    } catch (error) {
-      // Ignore errors - no processes might be running
-    }
-
-    const tryPort = (port: number): Promise<any> => {
-      return new Promise((resolve) => {
-        const server = livereload.createServer({
-          port: port,
-          delay: 0,
-          protocol: 'http',
-          usePolling: true,
-          exts: ['html', 'css', 'js', 'ts', 'ejs'],
-          exclusions: [/node_modules/]
-        });
-
-        server.server.on('error', () => {
-          resolve(null); // Port in use, try next
-        });
-
-        server.server.on('listening', () => {
-          console.log(`LiveReload server started on port ${port}`);
-          resolve(server);
-        });
-
-        server.watch(staticPath);
-
-        // Set a timeout in case the server hangs
-        setTimeout(() => {
-          try {
-            server.server.close();
-          } catch (e) {
-            // Ignore close errors
+// Kill existing LiveReload processes
+async function cleanupLiveReload(): Promise<void> {
+  try {
+    console.log('Checking for existing LiveReload processes...');
+    
+    // Find processes using port 35729
+    const { stdout } = await execAsync('lsof -i :35729');
+    
+    if (stdout) {
+      console.log('Found existing LiveReload processes, cleaning up...');
+      const lines = stdout.split('\n');
+      
+      // Skip header line and process each line
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line) {
+          const parts = line.split(/\s+/);
+          if (parts.length >= 2) {
+            const pid = parts[1];
+            try {
+              await execAsync(`kill -9 ${pid}`);
+              console.log(`Killed process ${pid}`);
+            } catch (error) {
+              console.log(`Failed to kill process ${pid}:`, error);
+            }
           }
-          resolve(null);
-        }, 1000);
-      });
-    };
-
-    while (currentPort <= maxPort) {
-      try {
-        const server = await tryPort(currentPort);
-        if (server) {
-          // Configure middleware with the working port
-          app.use(connectLivereload({
-            port: currentPort,
-            src: `http://localhost:${currentPort}/livereload.js?snipver=1`
-          }));
-
-          // Add CSP headers
-          app.use((_req, res, next) => {
-            res.setHeader(
-              "Content-Security-Policy",
-              "default-src 'self'; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*; " +
-              "style-src 'self' 'unsafe-inline' 'unsafe-hashes'; " +
-              "img-src 'self' data: https:; " +
-              "font-src 'self' data:; " +
-              `connect-src 'self' ws://localhost:${currentPort} http://localhost:*; ` +
-              "base-uri 'self';"
-            );
-            next();
-          });
-          
-          return;
         }
-      } catch (error) {
-        console.error(`Error on port ${currentPort}:`, error);
       }
-      currentPort++;
+    } else {
+      console.log('No existing LiveReload processes found');
     }
-
-    console.log('Could not find available port for LiveReload, continuing without it');
-  };
-
-  // Start LiveReload
-  startLiveReload().catch(err => {
-    console.error('Failed to start LiveReload:', err);
-  });
+  } catch (error) {
+    // If lsof command fails, it means no process is using the port
+    console.log('No existing LiveReload processes found');
+  }
 }
 
-// Routes
-app.get("/", (_req, res) => res.redirect("/lobby")); // Redirect root to lobby
-app.use("/", authRoutes);
-app.use("/", lobbyRoutes);
-app.use("/game", gameRoutes);
-app.use("/tests", routes.tests);
+// Run cleanup before starting LiveReload
+cleanupLiveReload().then(() => {
+  // Configure LiveReload
+  const liveReloadServer = livereload.createServer({
+    port: 35729,
+    exts: ['js', 'css', 'ejs'],
+    debug: true
+  });
 
-// 404 handler
-app.use((_request, _response, next) => next(httpErrors(404)));
+  liveReloadServer.watch([
+    path.join(process.cwd(), 'public'),
+    path.join(process.cwd(), 'src/server/views')
+  ]);
 
-// Error handler
-app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  res.locals.message = err.message;
-  res.locals.error = req.app.get("env") === "development" ? err : {};
-  res.status(err.status || 500);
-  res.render("error");
+  liveReloadServer.server.once("connection", () => {
+    setTimeout(() => {
+      liveReloadServer.refresh("/");
+    }, 100);
+  });
+
+  // Add LiveReload middleware
+  app.use(connectLivereload());
+}).catch(error => {
+  console.error('Failed to cleanup LiveReload:', error);
 });
 
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
+
+// Session configuration
+app.use(session({
+  secret: process.env.JWT_SECRET || 'your_secret_key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+    sameSite: 'lax'
+  },
+  name: 'monopoly.sid', // Custom session cookie name
+  rolling: true // Refresh session with each request
+}));
+
+// Add user data to locals
+app.use(addUserToLocals);
+
+// View engine setup
+app.set('view engine', 'ejs');
+app.set('views', path.join(process.cwd(), 'src', 'server', 'views'));
+
+// Root route - redirect to lobby or login
+app.get('/', (req, res) => {
+  const session = req.session as session.Session & { userId?: number };
+  if (session.userId) {
+    res.redirect('/lobby');
+  } else {
+    res.redirect('/login');
+  }
+});
+
+// Routes
+app.use(authRoutes);
+app.use('/game', gameRoutes);
+app.use(lobbyRoutes);
+
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Error:', err);
+  res.status(err.status || 500);
+  res.render('error', {
+    message: err.message,
+    error: process.env.NODE_ENV === 'development' ? err : {}
+  });
+});
+
+// Start server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

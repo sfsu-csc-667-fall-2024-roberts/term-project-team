@@ -1,17 +1,8 @@
-import { GameState as SharedGameState } from '../../shared/types';
+import { GameState as SharedGameState, Player as SharedPlayer, Property as SharedProperty } from '../../shared/types';
 
 export type GameState = SharedGameState;
-
-export interface Player {
-  id: number;
-  user_id: number | null;
-  username: string;
-  balance: number;
-  position: number;
-  is_bot: boolean;
-  bot_strategy?: 'aggressive' | 'conservative' | 'balanced';
-  bot_difficulty?: 'easy' | 'medium' | 'hard';
-}
+export type Player = SharedPlayer;
+export type Property = SharedProperty;
 
 export interface GameData {
   gameId: number;
@@ -20,16 +11,6 @@ export interface GameData {
   players: Player[];
   properties: Property[];
   gameState: GameState;
-}
-
-export interface Property {
-  id: number;
-  game_id: number;
-  position: number;
-  name: string;
-  owner_id: number | null;
-  house_count: number;
-  mortgaged: boolean;
 }
 
 export interface PurchaseResponse {

@@ -66,77 +66,105 @@ if (process.env.NODE_ENV !== "production") {
   const connectLivereload = require("connect-livereload");
   
   // Create LiveReload server with dynamic port
-  const startLiveReload = () => {
-    // Use a different port range to avoid conflicts
-    let port = 45729;
-    const maxAttempts = 10;
+  const startLiveReload = async () => {
+    const basePort = 35729; // Default LiveReload port
+    const maxPort = 35739; // Try up to 10 ports
+    let currentPort = basePort;
 
-    const tryPort = (attempt = 0) => {
-      if (attempt >= maxAttempts) {
-        console.log('Could not find available port for LiveReload, continuing without it');
-        return;
-      }
+    // Kill any existing LiveReload processes
+    try {
+      const { execSync } = require('child_process');
+      console.log('Checking for existing LiveReload processes...');
+      const cmd = process.platform === 'win32' 
+        ? `FOR /F "tokens=5" %P IN ('netstat -a -n -o ^| findstr :35729') DO TaskKill /PID %P /F /T` 
+        : `lsof -ti:35729 | xargs kill -9`;
+      execSync(cmd, { stdio: 'ignore' });
+      console.log('Cleaned up existing LiveReload processes');
+    } catch (error) {
+      // Ignore errors - no processes might be running
+    }
 
-      const server = livereload.createServer({
-        port: port + attempt,
-        delay: 0,
-        protocol: 'http',
-        usePolling: true,
-        exts: ['html', 'css', 'js', 'ts', 'ejs'],
-        exclusions: [/node_modules/]
-      }, () => {
-        console.log(`LiveReload server started on port ${port + attempt}`);
-      });
-
-      server.server.on('error', (err: any) => {
-        if (err.code === 'EADDRINUSE') {
-          console.log(`Port ${port + attempt} in use, trying next port...`);
-          tryPort(attempt + 1);
-        } else {
-          console.error('LiveReload error:', err);
-        }
-      });
-
-      server.server.on('listening', () => {
-        const actualPort = (server.server.address() as any).port;
-        
-        // Configure middleware with the working port
-        app.use(connectLivereload({
-          port: actualPort,
-          src: `http://localhost:${actualPort}/livereload.js?snipver=1`
-        }));
-
-        // Add CSP headers
-        app.use((_req, res, next) => {
-          res.setHeader(
-            "Content-Security-Policy",
-            "default-src 'self'; " +
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*; " +
-            "style-src 'self' 'unsafe-inline' 'unsafe-hashes'; " +
-            "img-src 'self' data: https:; " +
-            "font-src 'self' data:; " +
-            `connect-src 'self' ws://localhost:${actualPort} http://localhost:*; ` +
-            "base-uri 'self';"
-          );
-          next();
+    const tryPort = (port: number): Promise<any> => {
+      return new Promise((resolve) => {
+        const server = livereload.createServer({
+          port: port,
+          delay: 0,
+          protocol: 'http',
+          usePolling: true,
+          exts: ['html', 'css', 'js', 'ts', 'ejs'],
+          exclusions: [/node_modules/]
         });
-      });
 
-      server.watch(staticPath);
+        server.server.on('error', () => {
+          resolve(null); // Port in use, try next
+        });
+
+        server.server.on('listening', () => {
+          console.log(`LiveReload server started on port ${port}`);
+          resolve(server);
+        });
+
+        server.watch(staticPath);
+
+        // Set a timeout in case the server hangs
+        setTimeout(() => {
+          try {
+            server.server.close();
+          } catch (e) {
+            // Ignore close errors
+          }
+          resolve(null);
+        }, 1000);
+      });
     };
 
-    tryPort();
+    while (currentPort <= maxPort) {
+      try {
+        const server = await tryPort(currentPort);
+        if (server) {
+          // Configure middleware with the working port
+          app.use(connectLivereload({
+            port: currentPort,
+            src: `http://localhost:${currentPort}/livereload.js?snipver=1`
+          }));
+
+          // Add CSP headers
+          app.use((_req, res, next) => {
+            res.setHeader(
+              "Content-Security-Policy",
+              "default-src 'self'; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*; " +
+              "style-src 'self' 'unsafe-inline' 'unsafe-hashes'; " +
+              "img-src 'self' data: https:; " +
+              "font-src 'self' data:; " +
+              `connect-src 'self' ws://localhost:${currentPort} http://localhost:*; ` +
+              "base-uri 'self';"
+            );
+            next();
+          });
+          
+          return;
+        }
+      } catch (error) {
+        console.error(`Error on port ${currentPort}:`, error);
+      }
+      currentPort++;
+    }
+
+    console.log('Could not find available port for LiveReload, continuing without it');
   };
 
   // Start LiveReload
-  startLiveReload();
+  startLiveReload().catch(err => {
+    console.error('Failed to start LiveReload:', err);
+  });
 }
 
 // Routes
 app.get("/", (_req, res) => res.redirect("/lobby")); // Redirect root to lobby
 app.use("/", authRoutes);
 app.use("/", lobbyRoutes);
-app.use("/", gameRoutes);
+app.use("/game", gameRoutes);
 app.use("/tests", routes.tests);
 
 // 404 handler

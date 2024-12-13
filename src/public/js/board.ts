@@ -112,6 +112,7 @@ class MonopolyBoard {
   }
 
   public updatePlayerPosition(playerId: number, position: number, playerIndex: number): void {
+    console.log(`Updating player ${playerId} to position ${position}`);
     let token = this.playerTokens.get(playerId);
     
     // Create token if it doesn't exist
@@ -132,29 +133,60 @@ class MonopolyBoard {
     }
 
     const space = this.container.querySelector(`[data-position="${position}"]`) as HTMLElement;
-    if (!space) return;
+    if (!space) {
+      console.error(`Space not found for position ${position}`);
+      return;
+    }
 
     const spaceRect = space.getBoundingClientRect();
     const boardRect = this.container.getBoundingClientRect();
 
     // Calculate relative position within the board
-    const relativeX = spaceRect.left - boardRect.left + (spaceRect.width / 2) - 10;
-    const relativeY = spaceRect.top - boardRect.top + (spaceRect.height / 2) - 10;
+    let relativeX = spaceRect.left - boardRect.left + (spaceRect.width / 2) - 10;
+    let relativeY = spaceRect.top - boardRect.top + (spaceRect.height / 2) - 10;
 
     // Add offset based on player index to prevent overlap
     const offset = playerIndex * 15;
     const isCorner = position % 10 === 0;
     
     if (isCorner) {
-      // For corner spaces, arrange tokens in a 2x2 grid
+      // For corner spaces (including GO), arrange tokens in a grid
       const row = Math.floor(playerIndex / 2);
       const col = playerIndex % 2;
-      token.style.left = `${relativeX + (col * 20)}px`;
-      token.style.top = `${relativeY + (row * 20)}px`;
+      
+      // Special handling for GO space (position 0)
+      if (position === 0) {
+        relativeX = spaceRect.left - boardRect.left + spaceRect.width - 30 + (col * 20);
+        relativeY = spaceRect.top - boardRect.top + spaceRect.height - 30 + (row * 20);
+      } else {
+        relativeX += (col * 20);
+        relativeY += (row * 20);
+      }
+      
+      token.style.left = `${relativeX}px`;
+      token.style.top = `${relativeY}px`;
     } else {
-      // For regular spaces, arrange tokens horizontally with slight vertical offset
-      token.style.left = `${relativeX + offset}px`;
-      token.style.top = `${relativeY + (playerIndex * 5)}px`;
+      // For regular spaces, arrange tokens with offset
+      const side = Math.floor(position / 10); // 0: bottom, 1: left, 2: top, 3: right
+      
+      switch (side) {
+        case 0: // Bottom row
+          token.style.left = `${relativeX + offset}px`;
+          token.style.top = `${relativeY}px`;
+          break;
+        case 1: // Left column
+          token.style.left = `${relativeX}px`;
+          token.style.top = `${relativeY + offset}px`;
+          break;
+        case 2: // Top row
+          token.style.left = `${relativeX + offset}px`;
+          token.style.top = `${relativeY}px`;
+          break;
+        case 3: // Right column
+          token.style.left = `${relativeX}px`;
+          token.style.top = `${relativeY + offset}px`;
+          break;
+      }
     }
 
     // Highlight current player's token
@@ -165,6 +197,8 @@ class MonopolyBoard {
       token.style.transform = 'scale(1)';
       token.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
     }
+
+    console.log(`Token positioned at ${token.style.left}, ${token.style.top}`);
   }
 
   public updatePropertyOwnership(property: Property, ownerIndex: number): void {

@@ -26,7 +26,7 @@
           });
         %>
         <% sortedPlayers.forEach(player => { %>
-          <div class="player-card <%= player.id === currentPlayerId ? 'current-player' : '' %> <%= player.is_bot ? 'bot-player' : '' %>">
+          <div class="player-card <%= player.id === currentPlayerId ? 'current-player' : '' %> <%= player.is_bot ? 'bot-player' : '' %>" data-player-id="<%= player.id %>">
             <div class="player-info">
               <h3>
                 <%= player.username %> 
@@ -39,14 +39,14 @@
               </h3>
               <p class="balance">Balance: $<%= player.balance %></p>
               <p class="position">Position: <%= player.position %></p>
-              <% if (gameState.phase === 'waiting') { %>
-                <% const roll = gameState.dice_rolls.find(r => r.playerId === player.id); %>
-                <% if (roll) { %>
-                  <p class="roll">Initial Roll: <%= roll.roll %></p>
+              <p class="roll-status">
+                <% if (gameState.phase === 'waiting') { %>
+                  <% const roll = gameState.dice_rolls.find(r => r.playerId === player.id); %>
+                  <%= roll ? `Initial Roll: ${roll.roll}` : 'Waiting for roll...' %>
                 <% } else { %>
-                  <p class="roll">Waiting for roll...</p>
+                  <%= player.id === currentPlayerId ? 'Current turn' : 'Waiting for turn...' %>
                 <% } %>
-              <% } %>
+              </p>
             </div>
           </div>
         <% }); %>

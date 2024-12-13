@@ -21,6 +21,11 @@ export interface Player {
   updated_at: Date;
 }
 
+export interface PlayerWithRoll extends Player {
+  roll?: number;
+  hasRolled?: boolean;
+}
+
 export interface Property {
   id: number;
   game_id: number;
@@ -40,4 +45,21 @@ export interface Game {
   game_state: GameState;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface RollResponse {
+  roll: number;
+  gameState: GameState;
+  newPosition?: number;
+  players?: PlayerWithRoll[];
+  currentPlayer?: PlayerWithRoll;
+}
+
+export interface GameData {
+  gameId: number;
+  currentUserId: number | null;
+  currentPlayerId: number | null;
+  players: Player[];
+  properties: Property[];
+  gameState: GameState;
 } 

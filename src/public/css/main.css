@@ -127,4 +127,171 @@ body {
 
 .error-actions {
     margin-top: 2rem;
+}
+
+/* Lobby styles */
+.lobby-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.lobby-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.lobby-subtitle {
+    color: #666;
+    margin-top: 0.5rem;
+}
+
+.lobby-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+.create-game-section,
+.games-section {
+    background: #fff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.section-header {
+    margin-bottom: 1.5rem;
+}
+
+.section-description {
+    color: #666;
+    margin-top: 0.5rem;
+}
+
+.create-game-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-control {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-text {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.bot-options {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.radio-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.radio-card:hover {
+    border-color: #4a90e2;
+    background: #f8f9fa;
+}
+
+.radio-card input[type="radio"] {
+    margin-top: 0.25rem;
+}
+
+.radio-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.radio-title {
+    font-weight: 500;
+}
+
+.radio-description {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.create-game-btn {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #4a90e2;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background 0.2s;
+    position: sticky;
+    bottom: 1rem;
+}
+
+.create-game-btn:hover {
+    background: #357abd;
+}
+
+.btn-icon {
+    font-size: 1.2rem;
+}
+
+/* Make the form scrollable while keeping the button visible */
+.create-game-form {
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    padding-bottom: 4rem; /* Space for the sticky button */
+    position: relative;
+}
+
+/* Hide scrollbar but keep functionality */
+.create-game-form::-webkit-scrollbar {
+    width: 0;
+    background: transparent;
+}
+
+/* Responsive layout */
+@media (max-width: 768px) {
+    .lobby-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .create-game-form {
+        max-height: none;
+    }
+    
+    .create-game-btn {
+        position: static;
+        margin-top: 1.5rem;
+    }
 } 

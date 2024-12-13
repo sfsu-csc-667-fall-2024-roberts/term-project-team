@@ -205,17 +205,48 @@
 
 /* Center logo */
 .board-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.board-center-monopoly {
   font-size: 3rem;
   font-weight: bold;
   color: #000;
   text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
   white-space: nowrap;
-  z-index: 1;
   text-align: center;
+}
+
+.board-center-prompt {
+  display: flex;
+  column-gap: 32px;
+  background-color: white;
+  border: 2px solid black;
+  border-radius: 8px;
+  padding: 32px;
+}
+
+.board-center-card-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 180px;
+  height: 180px;
+}
+
+.board-center-card {
+  position: initial;
+  scale: 3;
+}
+
+.board-center-options {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
 }
 
 /* Player tokens */

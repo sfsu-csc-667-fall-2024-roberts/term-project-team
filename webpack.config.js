@@ -5,6 +5,7 @@ module.exports = {
   mode: 'development',
   entry: {
     game: './src/public/js/game.ts',
+    lobby: './src/public/js/lobby.ts',
     styles: [
       './src/public/css/main.css',
       './src/public/css/auth.css',

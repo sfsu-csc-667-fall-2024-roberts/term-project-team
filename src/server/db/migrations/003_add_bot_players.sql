@@ -16,6 +16,22 @@ BEGIN
         ALTER TABLE players ADD COLUMN is_bot BOOLEAN NOT NULL DEFAULT false;
     END IF;
 
+    -- Add bot_strategy column for different bot behaviors
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                  WHERE table_name = 'players' AND column_name = 'bot_strategy') THEN
+        ALTER TABLE players ADD COLUMN bot_strategy VARCHAR(50);
+        ALTER TABLE players ADD CONSTRAINT bot_strategy_check 
+            CHECK (bot_strategy IN ('aggressive', 'conservative', 'balanced') OR bot_strategy IS NULL);
+    END IF;
+
+    -- Add bot_difficulty column
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                  WHERE table_name = 'players' AND column_name = 'bot_difficulty') THEN
+        ALTER TABLE players ADD COLUMN bot_difficulty VARCHAR(20);
+        ALTER TABLE players ADD CONSTRAINT bot_difficulty_check 
+            CHECK (bot_difficulty IN ('easy', 'medium', 'hard') OR bot_difficulty IS NULL);
+    END IF;
+
     -- Add username column if it doesn't exist
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                   WHERE table_name = 'players' AND column_name = 'username') THEN
@@ -34,16 +50,4 @@ BEGIN
     -- Re-add foreign key with ON DELETE CASCADE
     ALTER TABLE players ADD CONSTRAINT players_user_id_fkey 
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-
-    -- Add bot_strategy column for different bot behaviors
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                  WHERE table_name = 'players' AND column_name = 'bot_strategy') THEN
-        ALTER TABLE players ADD COLUMN bot_strategy VARCHAR(50) CHECK (bot_strategy IN ('aggressive', 'conservative', 'balanced'));
-    END IF;
-
-    -- Add bot_difficulty column
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                  WHERE table_name = 'players' AND column_name = 'bot_difficulty') THEN
-        ALTER TABLE players ADD COLUMN bot_difficulty VARCHAR(20) CHECK (bot_difficulty IN ('easy', 'medium', 'hard'));
-    END IF;
 END $$;

@@ -1,16 +1,56 @@
 <%- include('partials/header') %>
 
 <div class="error-container">
-  <h1>Error</h1>
-  <% if (message) { %>
-    <p class="error-message"><%= message %></p>
+  <h1><%= message %></h1>
+  <% if (error.status) { %>
+    <h2><%= error.status %></h2>
   <% } %>
-  <% if (error && error.stack && process.env.NODE_ENV === 'development') { %>
-    <pre class="error-stack"><%= error.stack %></pre>
+  <% if (error.stack && process.env.NODE_ENV === 'development') { %>
+    <pre><%= error.stack %></pre>
   <% } %>
   <div class="error-actions">
-    <a href="/" class="btn btn-primary">Return Home</a>
+    <a href="/" class="btn btn-primary">Return to Home</a>
   </div>
 </div>
+
+<style>
+.error-container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  text-align: center;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.error-container h1 {
+  color: #e74c3c;
+  margin-bottom: 1rem;
+}
+
+.error-container h2 {
+  color: #7f8c8d;
+  margin-bottom: 2rem;
+}
+
+.error-container pre {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  text-align: left;
+  margin: 1rem 0;
+}
+
+.error-actions {
+  margin-top: 2rem;
+}
+
+.error-actions .btn {
+  padding: 0.5rem 1.5rem;
+  font-size: 1.1rem;
+}
+</style>
 
 <%- include('partials/footer') %> 

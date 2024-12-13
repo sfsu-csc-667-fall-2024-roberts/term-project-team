@@ -87,11 +87,21 @@ export async function createGame(ownerId: number): Promise<Game> {
 }
 
 export async function getGame(gameId: number): Promise<Game | null> {
-  const result = await pool.query(
-    'SELECT * FROM games WHERE id = $1',
-    [gameId]
-  );
-  return result.rows[0] || null;
+  if (!gameId || isNaN(gameId)) {
+    console.error('Invalid game ID:', gameId);
+    return null;
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM games WHERE id = $1',
+      [gameId]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error getting game:', error);
+    throw error;
+  }
 }
 
 export async function listGames(): Promise<(Game & { owner_username: string; player_count: number })[]> {
@@ -155,17 +165,21 @@ export async function addPlayerToGame(gameId: number, userId: number): Promise<P
 }
 
 export async function getGamePlayers(gameId: number): Promise<Player[]> {
-  const result = await pool.query(
-    `SELECT 
-      p.*,
-      COALESCE(u.username, p.username) as username
-    FROM players p
-    LEFT JOIN users u ON p.user_id = u.id
-    WHERE p.game_id = $1 
-    ORDER BY p.id ASC`,
-    [gameId]
-  );
-  return result.rows;
+  if (!gameId || isNaN(gameId)) {
+    console.error('Invalid game ID for players:', gameId);
+    return [];
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM players WHERE game_id = $1 ORDER BY id',
+      [gameId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error getting game players:', error);
+    throw error;
+  }
 }
 
 export async function updatePlayerState(
@@ -221,11 +235,21 @@ export async function createProperty(
 }
 
 export async function getGameProperties(gameId: number): Promise<Property[]> {
-  const result = await pool.query(
-    'SELECT * FROM properties WHERE game_id = $1 ORDER BY position ASC',
-    [gameId]
-  );
-  return result.rows;
+  if (!gameId || isNaN(gameId)) {
+    console.error('Invalid game ID for properties:', gameId);
+    return [];
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM properties WHERE game_id = $1 ORDER BY position',
+      [gameId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error getting game properties:', error);
+    throw error;
+  }
 }
 
 export async function updatePropertyState(

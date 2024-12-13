@@ -7,7 +7,27 @@ interface BotDecision {
 }
 
 export class BotService {
-  private static readonly PROPERTY_VALUE_THRESHOLD = 0.4;
+  static generateBotName(strategy: string, difficulty: string): string {
+    const strategyAdjectives = {
+      aggressive: ['Bold', 'Fierce', 'Daring'],
+      conservative: ['Steady', 'Careful', 'Prudent'],
+      balanced: ['Smart', 'Balanced', 'Wise']
+    };
+
+    const difficultyNouns = {
+      easy: ['Novice', 'Beginner', 'Rookie'],
+      medium: ['Player', 'Trader', 'Investor'],
+      hard: ['Expert', 'Master', 'Pro']
+    };
+
+    const adjectives = strategyAdjectives[strategy as keyof typeof strategyAdjectives] || strategyAdjectives.balanced;
+    const nouns = difficultyNouns[difficulty as keyof typeof difficultyNouns] || difficultyNouns.medium;
+
+    const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const noun = nouns[Math.floor(Math.random() * nouns.length)];
+
+    return `${adjective} ${noun}`;
+  }
 
   static async makeDecision(
     bot: Player,
@@ -20,73 +40,62 @@ export class BotService {
       return { action: 'end_turn' };
     }
 
-    // If property is owned by another player, pay rent
+    // If property is owned by someone else, pay rent
     if (currentProperty.owner_id && currentProperty.owner_id !== bot.id) {
-      return { action: 'pay_rent', property: currentProperty };
-    }
-
-    // If property is unowned, decide whether to buy
-    if (!currentProperty.owner_id) {
-      const shouldBuy = this.shouldBuyProperty(bot, currentProperty, allProperties);
       return {
-        action: shouldBuy ? 'buy' : 'pass',
+        action: 'pay_rent',
         property: currentProperty
       };
     }
 
+    // If property is unowned, decide whether to buy based on strategy
+    if (!currentProperty.owner_id) {
+      const propertyData = BOARD_SPACES.find(space => space.position === currentProperty.position);
+      if (!propertyData || !('price' in propertyData)) {
+        return { action: 'pass' };
+      }
+
+      const price = propertyData.price as number;
+      const shouldBuy = this.shouldBotBuyProperty(bot, price);
+
+      if (shouldBuy && bot.balance >= price) {
+        return {
+          action: 'buy',
+          property: currentProperty
+        };
+      }
+    }
+
+    // Default to ending turn
     return { action: 'end_turn' };
   }
 
-  private static shouldBuyProperty(
-    bot: Player,
-    property: Property,
-    allProperties: Property[]
-  ): boolean {
-    const boardSpace = BOARD_SPACES[property.position];
-    if (!boardSpace || boardSpace.type !== 'property') return false;
+  private static shouldBotBuyProperty(bot: Player, price: number): boolean {
+    // Default to balanced strategy
+    let buyThreshold = 0.3; // Will buy if price is less than 30% of balance
 
-    // Get property price from board data
-    const price = boardSpace.price || 0;
-
-    // Basic strategy checks
-    const canAfford = bot.balance >= price;
-    const isGoodValue = price <= bot.balance * this.PROPERTY_VALUE_THRESHOLD;
-
-    // Strategy-specific logic
-    const strategy = bot.bot_strategy ?? 'balanced';
-    switch (strategy) {
+    switch (bot.bot_strategy) {
       case 'aggressive':
-        // Buy if can afford and has less than 70% of properties
-        const ownedCount = allProperties.filter(p => p.owner_id === bot.id).length;
-        return canAfford && (ownedCount / allProperties.length < 0.7);
-
+        buyThreshold = 0.5; // Will buy if price is less than 50% of balance
+        break;
       case 'conservative':
-        // Only buy if it's a really good deal and bot has lots of money
-        return canAfford && (price <= bot.balance * 0.25);
-
+        buyThreshold = 0.2; // Will buy if price is less than 20% of balance
+        break;
       case 'balanced':
       default:
-        // Default balanced strategy
-        return canAfford && isGoodValue;
+        buyThreshold = 0.3;
     }
-  }
 
-  static generateBotName(strategy: string, difficulty: string): string {
-    const strategyNames = {
-      aggressive: ['Risky', 'Bold', 'Daring'],
-      conservative: ['Careful', 'Prudent', 'Wise'],
-      balanced: ['Steady', 'Balanced', 'Smart']
-    };
-    
-    const difficultyNames = {
-      easy: ['Rookie', 'Novice', 'Beginner'],
-      medium: ['Player', 'Trader', 'Dealer'],
-      hard: ['Pro', 'Expert', 'Master']
-    };
+    // Adjust threshold based on difficulty
+    switch (bot.bot_difficulty) {
+      case 'easy':
+        buyThreshold *= 0.8; // 20% less likely to buy
+        break;
+      case 'hard':
+        buyThreshold *= 1.2; // 20% more likely to buy
+        break;
+    }
 
-    const strategyName = strategyNames[strategy as keyof typeof strategyNames]?.[Math.floor(Math.random() * 3)] || 'Bot';
-    const difficultyName = difficultyNames[difficulty as keyof typeof difficultyNames]?.[Math.floor(Math.random() * 3)] || '';
-    
-    return `${strategyName} ${difficultyName}`;
+    return price <= bot.balance * buyThreshold;
   }
 } 

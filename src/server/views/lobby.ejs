@@ -16,7 +16,7 @@
       <form action="/games" method="POST" class="create-game-form">
         <div class="form-group">
           <label for="bot-count">Number of Bot Players</label>
-          <select name="botCount" id="bot-count" class="form-control" onchange="toggleBotOptions(this.value)">
+          <select name="botCount" id="bot-count" class="form-control">
             <option value="0">No Bots</option>
             <option value="1">1 Bot</option>
             <option value="2">2 Bots</option>
@@ -163,11 +163,6 @@ function toggleBotOptions(value) {
   const botOptions = document.getElementById('bot-options');
   botOptions.style.display = value === '0' ? 'none' : 'block';
 }
-
-// Initialize bot options visibility based on initial selection
-document.addEventListener('DOMContentLoaded', function() {
-  toggleBotOptions(document.getElementById('bot-count').value);
-});
 </script>
 
 <%- include('partials/footer') %>

@@ -2,9 +2,9 @@ import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
 import { Property } from './types';
 
 export default class MonopolyBoard {
-  private container: HTMLElement;
-  private playerTokens: Map<number, HTMLElement>;
-  private propertyOwnership: Map<number, HTMLElement>;
+  private container!: HTMLElement;
+  private playerTokens: Map<number, HTMLElement> = new Map();
+  private propertyOwnership: Map<number, HTMLElement> = new Map();
   private playerColors = {
     base: [
       '#E53935', // Red
@@ -28,33 +28,72 @@ export default class MonopolyBoard {
     ]
   };
   private currentPlayerId: number = -1;
+  private static instance: MonopolyBoard | null = null;
 
   constructor(containerId: string) {
+    console.log('MonopolyBoard constructor called', { containerId });
+    
+    // If an instance exists and it's for the same container, return it
+    if (MonopolyBoard.instance) {
+      console.log('Existing board instance found');
+      if (MonopolyBoard.instance.container.id === containerId) {
+        console.log('Returning existing instance for same container');
+        return MonopolyBoard.instance;
+      }
+      // If it's for a different container, clean up the old instance
+      console.log('Cleaning up old instance for different container');
+      MonopolyBoard.instance.cleanup();
+    }
+
     const element = document.getElementById(containerId);
     if (!element) {
       throw new Error(`Element with id ${containerId} not found`);
     }
+    console.log('Found board container:', element);
+
     this.container = element;
-    this.playerTokens = new Map();
-    this.propertyOwnership = new Map();
     this.initializeBoard();
+    MonopolyBoard.instance = this;
+  }
+
+  private cleanup(): void {
+    console.log('Cleaning up board instance');
+    // Remove all player tokens
+    this.playerTokens.forEach(token => token.remove());
+    this.playerTokens.clear();
+
+    // Remove all property ownership markers
+    this.propertyOwnership.forEach(marker => marker.remove());
+    this.propertyOwnership.clear();
+
+    // Clear the container
+    if (this.container) {
+      this.container.innerHTML = '';
+    }
   }
 
   private initializeBoard(): void {
-    // Clear existing content
-    this.container.innerHTML = '';
+    console.log('Initializing board');
+    this.cleanup(); // Clean up any existing content
+    
+    // Create board wrapper
+    const boardWrapper = document.createElement('div');
+    boardWrapper.className = 'board-wrapper';
+    this.container.appendChild(boardWrapper);
 
     // Add board spaces
     BOARD_SPACES.forEach(space => {
       const spaceElement = this.createBoardSpace(space);
-      this.container.appendChild(spaceElement);
+      boardWrapper.appendChild(spaceElement);
+      console.log(`Created space: ${space.name} at position ${space.position}`);
     });
 
     // Add center area
     const centerArea = document.createElement('div');
     centerArea.className = 'board-center';
-    centerArea.textContent = 'MONOPOLY';
-    this.container.appendChild(centerArea);
+    centerArea.innerHTML = '<div class="board-center-monopoly">MONOPOLY</div>';
+    boardWrapper.appendChild(centerArea);
+    console.log('Board initialization complete');
   }
 
   private createBoardSpace(space: BoardSpace): HTMLElement {
@@ -96,7 +135,7 @@ export default class MonopolyBoard {
     // Add color bar for properties
     if (space.type === 'property' && space.color) {
       const colorBar = document.createElement('div');
-      colorBar.className = `property-color-bar color-${space.color}`;
+      colorBar.className = `property-color-bar ${space.color}`;
       content.appendChild(colorBar);
     }
 
@@ -184,33 +223,33 @@ export default class MonopolyBoard {
         relativeX += (col * 20);
         relativeY += (row * 20);
       }
+      
+      // Set token position for corner spaces
+      token.style.left = `${relativeX}px`;
+      token.style.top = `${relativeY}px`;
     } else {
       // For regular spaces, arrange tokens with offset
       const side = Math.floor(position / 10); // 0: bottom, 1: left, 2: top, 3: right
       
       switch (side) {
         case 0: // Bottom row
-          token.style.left = `${relativeX + offset}px`;
-          token.style.top = `${relativeY}px`;
+          relativeX += offset;
           break;
         case 1: // Left column
-          token.style.left = `${relativeX}px`;
-          token.style.top = `${relativeY + offset}px`;
+          relativeY += offset;
           break;
         case 2: // Top row
-          token.style.left = `${relativeX + offset}px`;
-          token.style.top = `${relativeY}px`;
+          relativeX += offset;
           break;
         case 3: // Right column
-          token.style.left = `${relativeX}px`;
-          token.style.top = `${relativeY + offset}px`;
+          relativeY += offset;
           break;
       }
+      
+      // Set token position for regular spaces
+      token.style.left = `${relativeX}px`;
+      token.style.top = `${relativeY}px`;
     }
-
-    // Set token position
-    token.style.left = `${relativeX}px`;
-    token.style.top = `${relativeY}px`;
 
     // Highlight current player's token
     if (this.currentPlayerId === playerId) {

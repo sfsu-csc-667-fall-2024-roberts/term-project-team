@@ -125,16 +125,19 @@ export class CardActionService {
       throw new Error('Repair action missing house or hotel value');
     }
 
-    const playerProperties = this.properties.filter(p => p.owner_id === player.id);
-    let totalCost = 0;
+    const playerProperties = this.properties.filter(p => p.ownerId === player.id);
+    let totalHouses = 0;
+    let totalHotels = 0;
 
     playerProperties.forEach(property => {
-      if (property.house_count === 5) { // Hotel
-        totalCost += card.action.hotelValue!;
+      if (property.houseCount < 5) {
+        totalHouses += property.houseCount;
       } else {
-        totalCost += property.house_count * card.action.value!;
+        totalHotels += 1;
       }
     });
+
+    const totalCost = totalHouses * card.action.value! + totalHotels * card.action.hotelValue!;
 
     player.balance -= totalCost;
     await updatePlayerState(player.id, {

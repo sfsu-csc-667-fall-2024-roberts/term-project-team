@@ -1,4 +1,4 @@
-import { GameData, Player, Property, GameState, PlayerWithRoll, RollResponse } from '../../shared/types';
+import { GameData, Player, Property, GameState, PlayerWithRoll, RollResponse, GamePhase } from '../../shared/types';
 import { BOARD_SPACES } from '../../shared/boardData';
 import MonopolyBoard from './board';
 
@@ -9,6 +9,17 @@ interface BotActionResponse {
   gameState: GameState;
 }
 
+const GAME_PHASES = {
+  WAITING: 'waiting' as const,
+  ROLLING: 'rolling' as const,
+  PROPERTY_DECISION: 'property_decision' as const,
+  PAYING_RENT: 'paying_rent' as const,
+  IN_JAIL: 'in_jail' as const,
+  BANKRUPT: 'bankrupt' as const,
+  GAME_OVER: 'game_over' as const,
+  PLAYING: 'playing' as const,
+} as const;
+
 class GameService {
   private gameData: GameData;
   private messageContainer: HTMLElement;
@@ -16,18 +27,63 @@ class GameService {
   private isProcessingBotTurn: boolean = false;
   private statusElement: HTMLElement;
   private playersElement: HTMLElement;
+  private static instance: GameService | null = null;
 
   constructor(gameData: GameData) {
+    console.log('GameService constructor called');
+    
+    // Singleton pattern to ensure only one game service instance
+    if (GameService.instance) {
+      console.log('Existing game service instance found, cleaning up');
+      GameService.instance.cleanup();
+    }
+
     this.gameData = gameData;
     this.messageContainer = document.querySelector('.game-messages') as HTMLElement;
     this.statusElement = document.querySelector('.game-status') as HTMLElement;
     this.playersElement = document.querySelector('.players-list') as HTMLElement;
+    
+    // Initialize board after cleaning up any existing instance
+    console.log('Initializing new board instance');
     this.board = new MonopolyBoard('monopoly-board');
+    
     this.initializeEventListeners();
     this.initializeBoard();
     this.updateGameStatus();
     this.updatePropertiesPanel();
     this.checkForBotTurn();
+    
+    GameService.instance = this;
+  }
+
+  private cleanup(): void {
+    console.log('Cleaning up game service');
+    // Remove event listeners
+    const rollDiceButton = document.getElementById('roll-dice');
+    const endTurnButton = document.getElementById('end-turn');
+    
+    if (rollDiceButton) {
+      rollDiceButton.replaceWith(rollDiceButton.cloneNode(true));
+    }
+    
+    if (endTurnButton) {
+      endTurnButton.replaceWith(endTurnButton.cloneNode(true));
+    }
+
+    // Clear message container
+    if (this.messageContainer) {
+      this.messageContainer.innerHTML = '';
+    }
+
+    // Clear status element
+    if (this.statusElement) {
+      this.statusElement.textContent = '';
+    }
+
+    // Clear players element
+    if (this.playersElement) {
+      this.playersElement.innerHTML = '';
+    }
   }
 
   private initializeEventListeners(): void {
@@ -48,10 +104,10 @@ class GameService {
       this.board.updatePlayerPosition(player.id, player.position, index);
     });
 
-    if (this.gameData.gameState.phase === 'playing') {
+    if (this.gameData.gameState.phase === GAME_PHASES.PLAYING) {
       this.gameData.properties.forEach((property: Property) => {
-        if (property.owner_id) {
-          const ownerIndex = this.gameData.players.findIndex((p: Player) => p.id === property.owner_id);
+        if (property.ownerId) {
+          const ownerIndex = this.gameData.players.findIndex((p: Player) => p.id === property.ownerId);
           if (ownerIndex !== -1) {
             this.board.updatePropertyOwnership(property, ownerIndex);
           }
@@ -90,7 +146,7 @@ class GameService {
       const data: RollResponse = await response.json();
       console.log('Roll response received:', data);
       
-      if (data.gameState.phase === 'waiting') {
+      if (data.gameState.phase === GAME_PHASES.WAITING) {
         console.log('Handling initial roll phase');
         await this.handleInitialRollPhase(data);
       } else {
@@ -380,7 +436,7 @@ class GameService {
     
     let currentPlayer: Player | undefined;
     
-    if (this.gameData.gameState.phase === 'waiting') {
+    if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
       // In waiting phase, current player is the one who hasn't rolled yet
       currentPlayer = this.gameData.players.find(p => 
         !this.gameData.gameState.dice_rolls.some(r => r.id === p.id) &&
@@ -410,7 +466,7 @@ class GameService {
     
     let statusText = '';
     
-    if (this.gameData.gameState.phase === 'waiting') {
+    if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
       const rollCount = this.gameData.gameState.dice_rolls.length;
       const totalPlayers = this.gameData.players.length;
       statusText = `Initial Roll Phase - Roll to determine turn order (${rollCount}/${totalPlayers} players rolled)`;
@@ -456,7 +512,7 @@ class GameService {
   private canPlayerRoll(currentPlayer: Player | undefined): boolean {
     if (!currentPlayer) return false;
     
-    if (this.gameData.gameState.phase === 'waiting') {
+    if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
       // In waiting phase, player can roll if they haven't rolled yet
       const hasRolled = this.gameData.gameState.dice_rolls.some(r => r.id === currentPlayer.id);
       const isCurrentUser = currentPlayer.id === this.gameData.currentPlayerId;
@@ -482,7 +538,7 @@ class GameService {
   private canPlayerEndTurn(currentPlayer: Player | undefined): boolean {
     if (!currentPlayer) return false;
     
-    if (this.gameData.gameState.phase === 'waiting') {
+    if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
       return false; // Can't end turn during waiting phase
     }
     
@@ -524,7 +580,7 @@ class GameService {
       // Update status
       const statusElement = playerElement.querySelector('.roll-status');
       if (statusElement) {
-        if (this.gameData.gameState.phase === 'waiting') {
+        if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
           const roll = this.gameData.gameState.dice_rolls.find(r => r.playerId === p.id);
           statusElement.textContent = roll ? 
             `Initial Roll: ${roll.dice ? `${roll.dice[0]} + ${roll.dice[1]} = ${roll.roll}` : roll.roll}` : 
@@ -890,8 +946,8 @@ class GameService {
 
     // Update property ownership
     this.gameData.properties.forEach((property: Property) => {
-      if (property.owner_id) {
-        const ownerIndex = this.gameData.players.findIndex((p: Player) => p.id === property.owner_id);
+      if (property.ownerId) {
+        const ownerIndex = this.gameData.players.findIndex((p: Player) => p.id === property.ownerId);
         if (ownerIndex !== -1) {
           this.board.updatePropertyOwnership(property, ownerIndex);
         }
@@ -1056,7 +1112,10 @@ class GameService {
         1000
       );
       
-      if (property.price !== undefined) {
+      // Only show purchase dialog if it's the current player's turn and they're not a bot
+      if (property.price !== undefined && 
+          currentPlayer.id === this.gameData.currentPlayerId && 
+          !currentPlayer.is_bot) {
         const purchaseConfirmed = await this.showPurchaseDialog(
           property.name,
           property.price,
@@ -1171,7 +1230,7 @@ class GameService {
     // Group properties by owner
     const propertiesByOwner = new Map<number | null, Property[]>();
     this.gameData.properties.forEach(property => {
-      const ownerId = property.owner_id || null;
+      const ownerId = property.ownerId || null;
       if (!propertiesByOwner.has(ownerId)) {
         propertiesByOwner.set(ownerId, []);
       }
@@ -1210,10 +1269,10 @@ class GameService {
               <span class="property-name">${property.name}</span>
               <span class="property-details">
                 ($${property.price}) 
-                ${property.house_count > 0 ? 
-                  `- ${property.house_count === 5 ? '🏨' : '🏠'.repeat(property.house_count)}` 
+                ${property.houseCount > 0 ? 
+                  `- ${property.houseCount === 5 ? '🏨' : '🏠'.repeat(property.houseCount)}` 
                   : ''}
-                ${property.mortgaged ? '📝 Mortgaged' : ''}
+                ${property.isMortgaged ? '📝 Mortgaged' : ''}
               </span>
             `;
             listItem.appendChild(propertyInfo);
@@ -1224,12 +1283,12 @@ class GameService {
               controls.className = 'property-controls';
               
               // House/Hotel controls
-              if (!property.mortgaged && (spaceData.type === 'property')) {
+              if (!property.isMortgaged && (spaceData.type === 'property')) {
                 const buildControls = document.createElement('div');
                 buildControls.className = 'build-controls';
                 
                 // House button
-                if (property.house_count < 4) {
+                if (property.houseCount < 4) {
                   const buildHouseButton = document.createElement('button');
                   buildHouseButton.textContent = 'Build House';
                   buildHouseButton.className = 'btn btn-sm btn-secondary';
@@ -1238,7 +1297,7 @@ class GameService {
                 }
 
                 // Hotel button (only show if 4 houses)
-                if (property.house_count === 4) {
+                if (property.houseCount === 4) {
                   const buildHotelButton = document.createElement('button');
                   buildHotelButton.textContent = 'Build Hotel';
                   buildHotelButton.className = 'btn btn-sm btn-secondary';
@@ -1253,13 +1312,13 @@ class GameService {
               const mortgageControls = document.createElement('div');
               mortgageControls.className = 'mortgage-controls';
               
-              if (property.mortgaged) {
+              if (property.isMortgaged) {
                 const unmortgageButton = document.createElement('button');
                 unmortgageButton.textContent = 'Unmortgage';
                 unmortgageButton.className = 'btn btn-sm btn-warning';
                 unmortgageButton.onclick = () => this.toggleMortgage(property, 'unmortgage');
                 mortgageControls.appendChild(unmortgageButton);
-              } else if (property.house_count === 0) {
+              } else if (property.houseCount === 0) {
                 const mortgageButton = document.createElement('button');
                 mortgageButton.textContent = 'Mortgage';
                 mortgageButton.className = 'btn btn-sm btn-danger';

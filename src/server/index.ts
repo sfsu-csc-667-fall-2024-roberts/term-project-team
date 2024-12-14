@@ -11,12 +11,37 @@ import { addUserToLocals } from './middleware';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import net from 'net';
+import pgSession from 'connect-pg-simple';
 
 const execAsync = promisify(exec);
 const LIVERELOAD_PORT = 35729;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize PostgreSQL session store
+const PostgresqlStore = pgSession(session);
+
+// Configure session middleware with PostgreSQL store
+app.use(session({
+  store: new PostgresqlStore({
+    pool,
+    tableName: 'user_sessions',   // Table to store sessions
+    createTableIfMissing: true,   // Auto-create sessions table
+    pruneSessionInterval: 60      // Cleanup old sessions every 60 seconds
+  }),
+  secret: process.env.JWT_SECRET || 'your_secret_key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+    sameSite: 'lax'
+  },
+  name: 'monopoly.sid', // custom session cookie name
+  rolling: true // Refresh session with each request
+}));
 
 // Check if a port is in use
 async function isPortInUse(port: number): Promise<boolean> {
@@ -121,21 +146,6 @@ initializeLiveReload().catch(error => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
-
-// Session configuration
-app.use(session({
-  secret: process.env.JWT_SECRET || 'your_secret_key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    httpOnly: true,
-    sameSite: 'lax'
-  },
-  name: 'monopoly.sid', // Custom session cookie name
-  rolling: true // Refresh session with each request
-}));
 
 // Add user data to locals
 app.use(addUserToLocals);

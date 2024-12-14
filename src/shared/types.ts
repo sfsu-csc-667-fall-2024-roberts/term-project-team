@@ -1,13 +1,15 @@
 export interface BoardSpace {
+  id?: number;
   position: number;
   name: string;
-  type: string;
+  type: 'property' | 'railroad' | 'utility' | 'tax' | 'chance' | 'chest' | 'corner' | 'jail';
   price?: number;
   houseCost?: number;
-  rent?: number;
+  hotelCost?: number;
   rentLevels?: number[];
   colorGroup?: string;
-  rentAmount?: number;
+  mortgageValue?: number;
+  color?: string;
 }
 
 export interface Card {
@@ -25,10 +27,12 @@ export interface Card {
 }
 
 export interface SpaceAction {
-  type: 'purchase_available' | 'pay_rent' | 'card_drawn';
+  type: 'purchase_available' | 'pay_rent' | 'card_drawn' | 'go_to_jail' | 'jail_action' | 'property_action';
   property?: Property | BoardSpace;
+  propertyAction?: PropertyAction;
   card?: Card;
   message?: string;
+  jailAction?: JailAction;
 }
 
 export interface Player {
@@ -56,19 +60,54 @@ export interface PlayerWithRoll extends Player {
 
 export interface Property {
   id: number;
-  game_id: number;
+  gameId: number;
   position: number;
   name: string;
-  owner_id: number | null;
-  house_count: number;
-  mortgaged: boolean;
-  price?: number;
-  created_at: Date;
-  updated_at: Date;
+  type: 'property' | 'railroad' | 'utility';
+  price: number;
+  rentLevels: number[];
+  houseCost: number;
+  hotelCost: number;
+  mortgageValue: number;
+  isMortgaged: boolean;
+  houseCount: number;
+  hasHotel: boolean;
+  colorGroup: string;
+  ownerId: number | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  rentAmount?: number;
+  colorSet?: string[];
+  newBalance?: number;
 }
 
+export interface PropertyAction {
+  type: 'mortgage' | 'unmortgage' | 'build' | 'sell';
+  propertyId: number;
+  success?: boolean;
+  message?: string;
+  cost?: number;
+}
+
+export interface PropertySet {
+  color: string;
+  properties: Property[];
+  completed: boolean;
+  canBuildHouses: boolean;
+}
+
+export type GamePhase = 
+  | 'waiting'
+  | 'rolling'
+  | 'property_decision'
+  | 'paying_rent'
+  | 'in_jail'
+  | 'bankrupt'
+  | 'game_over'
+  | 'playing';
+
 export interface GameState {
-  phase: 'waiting' | 'playing';
+  phase: GamePhase;
   current_player_index: number;
   dice_rolls: PlayerWithRoll[];
   turn_order: number[];
@@ -78,6 +117,17 @@ export interface GameState {
   last_position?: number;
   drawn_card?: Card;
   jail_free_cards?: { [playerId: number]: number };
+  doubles_count: number;
+  jail_turns: { [playerId: number]: number };
+  current_property_decision?: Property;
+  current_rent_owed?: {
+    amount: number;
+    to: number;
+    from: number;
+    property: Property;
+  };
+  bankrupt_players: number[];
+  winner?: number;
 }
 
 export interface Game {
@@ -98,6 +148,8 @@ export interface RollResponse {
   players?: PlayerWithRoll[];
   currentPlayer?: PlayerWithRoll;
   spaceAction?: SpaceAction;
+  inJail?: boolean;
+  jailRoll?: boolean;
 }
 
 export interface GameData {
@@ -118,4 +170,24 @@ export interface PurchaseResponse {
 
 export interface ApiError {
   error: string;
+}
+
+export interface JailAction {
+  type: 'jail_action';
+  action: 'pay_fine' | 'use_card' | 'roll_doubles';
+  success?: boolean;
+  message?: string;
+}
+
+export interface GameStateUpdate {
+  type: 'state_update';
+  state: GameState;
+  message: string;
+}
+
+export interface GameAction {
+  type: 'roll' | 'purchase' | 'pay_rent' | 'declare_bankruptcy' | 'end_turn';
+  playerId: number;
+  propertyId?: number;
+  amount?: number;
 } 

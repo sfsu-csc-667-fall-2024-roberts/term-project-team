@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth';
 import { pool } from '../db/config';
 import { createGame, getGames, joinGame, createBotPlayer, getUserById, deleteGame, leaveGame } from '../db/services/dbService';
 import session from 'express-session';
+import { PoolClient } from 'pg';
 
 type TypedSession = session.Session & {
   userId?: number;
@@ -49,6 +50,26 @@ router.post('/games', requireAuth, async (req, res) => {
       throw new Error('Not authenticated');
     }
 
+    // First verify user exists in database
+    const userCheck = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
+    console.log('User check query:', {
+      query: 'SELECT * FROM users WHERE id = $1',
+      params: [userId]
+    });
+    console.log('User check result:', {
+      userId,
+      found: userCheck.rows.length > 0,
+      userData: userCheck.rows[0],
+      rowCount: userCheck.rowCount
+    });
+
+    if (!userCheck.rows[0]) {
+      // Additional check - list all users in database
+      const allUsers = await client.query('SELECT id, username FROM users');
+      console.log('All users in database:', allUsers.rows);
+      throw new Error(`User ${userId} not found in database`);
+    }
+
     const botCount = parseInt(req.body.botCount) || 0;
     const botDifficulty = req.body.botDifficulty || 'medium';
     const botStrategy = req.body.botStrategy || 'balanced';
@@ -59,22 +80,23 @@ router.post('/games', requireAuth, async (req, res) => {
       botStrategy
     });
 
-    // Get user info
-    const user = await getUserById(userId);
+    // Get user info using transaction client
+    const userResult = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const user = userResult.rows[0];
     if (!user) {
-      throw new Error('User not found');
+      throw new Error(`User ${userId} not found in transaction context`);
     }
     console.log('Creating game for user:', { userId: user.id, username: user.username });
 
-    // Create the game
-    const game = await createGame(userId);
+    // Create the game using the transaction client
+    const game = await createGame(userId, client as PoolClient);
     console.log('Game created:', { gameId: game.id, ownerId: game.owner_id });
     
     // Add bot players if requested
     if (botCount > 0) {
       console.log(`Adding ${botCount} bots to game ${game.id}`);
       for (let i = 0; i < botCount; i++) {
-        const bot = await createBotPlayer(game.id, botStrategy, botDifficulty);
+        const bot = await createBotPlayer(game.id, botStrategy, botDifficulty, client as PoolClient);
         console.log(`Bot ${i + 1} created:`, bot);
       }
     }
@@ -86,7 +108,9 @@ router.post('/games', requireAuth, async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Game creation error:', error);
-    res.redirect('/lobby?error=failed-to-create-game');
+    // Add more detailed error information to the redirect
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.redirect(`/lobby?error=failed-to-create-game&details=${encodeURIComponent(errorMessage)}`);
   } finally {
     client.release();
     console.log('=== Game Creation Complete ===\n');

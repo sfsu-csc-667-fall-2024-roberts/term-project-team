@@ -1,19 +1,26 @@
 /* Game board container */
 #monopoly-board {
-  width: 660px;
-  height: 660px;
-  background: #C5FFC5;
+  width: min(700px, 80vh);
+  height: min(700px, 80vh);
   position: relative;
-  margin: 0;
   box-sizing: border-box;
   border: 2px solid #000;
+  background: #C5FFC5;
+  margin: auto;
 }
 
-/* Board spaces */
+.board-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Board spaces - unified styling for ALL spaces */
 .board-space {
   position: absolute;
-  width: 60px;
-  height: 60px;
+  width: 10%;
+  height: 10%;
   background: #fff;
   border: 1px solid #000;
   box-sizing: border-box;
@@ -22,23 +29,44 @@
   padding: 0;
 }
 
-/* Space content wrapper */
+/* Space content wrapper - unified for ALL spaces */
 .space-content {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start; /* Changed to flex-start to align content from top */
   padding: 2px;
   font-size: 0.6rem;
   text-align: center;
 }
 
+/* Corner spaces - now following same format as properties */
+.space-corner {
+  font-weight: bold;
+}
+
+.space-corner .space-content {
+  justify-content: space-between;
+}
+
+.space-corner .space-name {
+  font-size: 0.7rem;
+  margin-top: 2px;
+  width: 100%;
+}
+
+.space-corner .space-action {
+  font-size: 0.6rem;
+  margin-bottom: 2px;
+  width: 100%;
+}
+
 /* Property color bars */
 .property-color-bar {
   width: 100%;
-  height: 10px;
+  height: 15%;
   margin: 0;
 }
 
@@ -50,122 +78,111 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 2px;
+  padding: 1px;
 }
 
 /* Property name and price */
-.property-name {
-  font-size: 0.45rem;
-  line-height: 1.1;
+.property-name, .space-name {
+  font-size: 0.6rem;
+  line-height: 1;
   margin: 1px 0;
   text-align: center;
   width: 100%;
+  word-wrap: break-word;
 }
 
-.property-price {
-  font-size: 0.5rem;
+.property-price, .space-action {
+  font-size: 0.6rem;
   line-height: 1;
   margin: 1px 0;
   text-align: center;
   width: 100%;
 }
 
-/* Corner spaces */
-.space-corner {
-  width: 60px;
-  height: 60px;
-  padding: 2px;
-}
-
-.space-corner .space-content {
-  font-size: 0.65rem;
-  font-weight: bold;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  padding: 4px;
-}
-
-/* Special spaces */
-.space-railroad .space-content,
-.space-utility .space-content,
-.space-tax .space-content,
-.space-chance .space-content,
-.space-chest .space-content {
-  padding: 2px;
-  justify-content: space-between;
-}
-
-/* Space icons */
-.space-icon {
-  font-size: 0.8rem;
-  margin: 1px 0;
-}
-
 /* Position classes */
-/* Bottom row */
-.pos-0 { right: 0; bottom: 0; } /* GO */
-.pos-1 { right: 60px; bottom: 0; }
-.pos-2 { right: 120px; bottom: 0; }
-.pos-3 { right: 180px; bottom: 0; }
-.pos-4 { right: 240px; bottom: 0; }
-.pos-5 { right: 300px; bottom: 0; }
-.pos-6 { right: 360px; bottom: 0; }
-.pos-7 { right: 420px; bottom: 0; }
-.pos-8 { right: 480px; bottom: 0; }
-.pos-9 { right: 540px; bottom: 0; }
+/* Bottom row - 11 spaces (0-10) */
+.pos-0 { left: 90%; bottom: 0; } /* GO */
+.pos-1 { left: 80%; bottom: 0; }
+.pos-2 { left: 70%; bottom: 0; }
+.pos-3 { left: 60%; bottom: 0; }
+.pos-4 { left: 50%; bottom: 0; }
+.pos-5 { left: 40%; bottom: 0; }
+.pos-6 { left: 30%; bottom: 0; }
+.pos-7 { left: 20%; bottom: 0; }
+.pos-8 { left: 10%; bottom: 0; }
+.pos-9 { left: 0; bottom: 0; }
 .pos-10 { left: 0; bottom: 0; } /* Jail */
 
-/* Left column */
-.pos-11 { left: 0; bottom: 60px; }
-.pos-12 { left: 0; bottom: 120px; }
-.pos-13 { left: 0; bottom: 180px; }
-.pos-14 { left: 0; bottom: 240px; }
-.pos-15 { left: 0; bottom: 300px; }
-.pos-16 { left: 0; bottom: 360px; }
-.pos-17 { left: 0; bottom: 420px; }
-.pos-18 { left: 0; bottom: 480px; }
-.pos-19 { left: 0; bottom: 540px; }
+/* Left column - 9 spaces (11-19) */
+.pos-11 { left: 0; bottom: 90%; }
+.pos-12 { left: 0; bottom: 80%; }
+.pos-13 { left: 0; bottom: 70%; }
+.pos-14 { left: 0; bottom: 60%; }
+.pos-15 { left: 0; bottom: 50%; }
+.pos-16 { left: 0; bottom: 40%; }
+.pos-17 { left: 0; bottom: 30%; }
+.pos-18 { left: 0; bottom: 20%; }
+.pos-19 { left: 0; bottom: 10%; }
 .pos-20 { left: 0; top: 0; } /* Free Parking */
 
-/* Top row */
-.pos-21 { left: 60px; top: 0; }
-.pos-22 { left: 120px; top: 0; }
-.pos-23 { left: 180px; top: 0; }
-.pos-24 { left: 240px; top: 0; }
-.pos-25 { left: 300px; top: 0; }
-.pos-26 { left: 360px; top: 0; }
-.pos-27 { left: 420px; top: 0; }
-.pos-28 { left: 480px; top: 0; }
-.pos-29 { left: 540px; top: 0; }
+/* Top row - 9 spaces (21-29) */
+.pos-21 { left: 10%; top: 0; }
+.pos-22 { left: 20%; top: 0; }
+.pos-23 { left: 30%; top: 0; }
+.pos-24 { left: 40%; top: 0; }
+.pos-25 { left: 50%; top: 0; }
+.pos-26 { left: 60%; top: 0; }
+.pos-27 { left: 70%; top: 0; }
+.pos-28 { left: 80%; top: 0; }
+.pos-29 { left: 90%; top: 0; }
 .pos-30 { right: 0; top: 0; } /* Go to Jail */
 
-/* Right column */
-.pos-31 { right: 0; top: 60px; }
-.pos-32 { right: 0; top: 120px; }
-.pos-33 { right: 0; top: 180px; }
-.pos-34 { right: 0; top: 240px; }
-.pos-35 { right: 0; top: 300px; }
-.pos-36 { right: 0; top: 360px; }
-.pos-37 { right: 0; top: 420px; }
-.pos-38 { right: 0; top: 480px; }
-.pos-39 { right: 0; top: 540px; }
+/* Right column - 9 spaces (31-39) */
+.pos-31 { right: 0; top: 10%; }
+.pos-32 { right: 0; top: 20%; }
+.pos-33 { right: 0; top: 30%; }
+.pos-34 { right: 0; top: 40%; }
+.pos-35 { right: 0; top: 50%; }
+.pos-36 { right: 0; top: 60%; }
+.pos-37 { right: 0; top: 70%; }
+.pos-38 { right: 0; top: 80%; }
+.pos-39 { right: 0; top: 90%; }
 
-/* Corner colors */
-.space-corner.bottom-right { background-color: #28a745; color: white; } /* GO */
-.space-corner.bottom-left { background-color: #dc3545; color: white; }  /* Jail */
-.space-corner.top-left { background-color: #ffc107; color: black; }     /* Free Parking */
-.space-corner.top-right { background-color: #17a2b8; color: white; }    /* Go to Jail */
+/* Board center */
+.board-center {
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  right: 10%;
+  bottom: 10%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #C5FFC5;
+  border: 2px solid #000;
+  box-sizing: border-box;
+  z-index: 1;
+}
+
+.board-center-monopoly {
+  font-size: 4rem;
+  font-weight: bold;
+  color: #000;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+  white-space: nowrap;
+  text-align: center;
+  transform: rotate(-45deg);
+}
 
 /* Property colors */
-.color-brown { background-color: #955436; }
-.color-light-blue { background-color: #AAE0FA; }
-.color-pink { background-color: #D93A96; }
-.color-orange { background-color: #F7941D; }
-.color-red { background-color: #ED1B24; }
-.color-yellow { background-color: #FEF200; }
-.color-green { background-color: #1FB25A; }
-.color-blue { background-color: #0072BB; }
+.brown { background-color: #955436; }
+.light-blue { background-color: #AAE0FA; }
+.pink { background-color: #D93A96; }
+.orange { background-color: #F7941D; }
+.red { background-color: #ED1B24; }
+.yellow { background-color: #FEF200; }
+.green { background-color: #1FB25A; }
+.blue { background-color: #0072BB; }
 
 /* Special spaces styling */
 .space-railroad { background: #f0f0f0; }
@@ -174,114 +191,33 @@
 .space-chance { background: #FFDAB9; }
 .space-chest { background: #E6E6FA; }
 
-/* Railroad icon */
-.space-railroad .space-icon::before {
-  content: "🚂";
-  display: block;
-}
-
-/* Utility icons */
-.space-utility.water-works .space-icon::before {
-  content: "💧";
-  display: block;
-}
-
-.space-utility.electric-company .space-icon::before {
-  content: "⚡";
-  display: block;
-}
-
-/* Chance and Community Chest icons */
-.space-chance .space-icon::before {
-  content: "?";
-  display: block;
-  font-weight: bold;
-}
-
-.space-chest .space-icon::before {
-  content: "📦";
-  display: block;
-}
-
-/* Center logo */
-.board-center {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-}
-
-.board-center-monopoly {
-  font-size: 3rem;
-  font-weight: bold;
-  color: #000;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-  white-space: nowrap;
-  text-align: center;
-}
-
-.board-center-prompt {
-  display: flex;
-  column-gap: 32px;
-  background-color: white;
-  border: 2px solid black;
-  border-radius: 8px;
-  padding: 32px;
-}
-
-.board-center-card-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 180px;
-  height: 180px;
-}
-
-.board-center-card {
-  position: initial;
-  scale: 3;
-}
-
-.board-center-options {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-evenly;
-}
+/* Corner colors */
+.space-corner.bottom-right { background-color: #28a745; color: white; } /* GO */
+.space-corner.bottom-left { background-color: #dc3545; color: white; }  /* Jail */
+.space-corner.top-left { background-color: #ffc107; color: black; }     /* Free Parking */
+.space-corner.top-right { background-color: #17a2b8; color: white; }    /* Go to Jail */
 
 /* Player tokens */
 .player-token {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  position: absolute;
+  z-index: 100;
+  transition: all 0.5s ease-in-out;
+  border: 2px solid white;
+  box-shadow: 0 0 5px rgba(0,0,0,0.3);
+  cursor: pointer;
+}
+
+/* Property ownership indicators */
+.property-ownership-marker {
   width: 12px;
   height: 12px;
   border-radius: 50%;
   position: absolute;
-  transform: translate(-50%, -50%);
-  z-index: 10;
+  z-index: 50;
   border: 1px solid #000;
-  transition: all 0.3s ease;
+  box-shadow: 0 0 2px rgba(0,0,0,0.3);
 }
-
-/* Player colors */
-.player-0 { background-color: #ff0000; }  /* Red */
-.player-1 { background-color: #00ff00; }  /* Green */
-.player-2 { background-color: #0000ff; }  /* Blue */
-.player-3 { background-color: #ffff00; }  /* Yellow */
-
-/* Property ownership indicators */
-.property-owner-indicator {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid #000;
-  z-index: 5;
-}
-
-/* Owner colors */
-.owner-0 { background-color: #ff0000; }  /* Red */
-.owner-1 { background-color: #00ff00; }  /* Green */
-.owner-2 { background-color: #0000ff; }  /* Blue */
-.owner-3 { background-color: #ffff00; }  /* Yellow */
  

@@ -1,5 +1,6 @@
 import { Player, Property, GameState } from '../db/models/types';
 import { BOARD_SPACES } from '../../shared/boardData';
+import * as dbService from '../db/services/dbService';
 
 interface BotDecision {
   action: 'buy' | 'pass' | 'pay_rent' | 'end_turn';
@@ -7,58 +8,72 @@ interface BotDecision {
 }
 
 export class BotService {
-  static generateBotName(strategy: string, difficulty: string): string {
-    const strategyAdjectives = {
-      aggressive: ['Bold', 'Fierce', 'Daring'],
-      conservative: ['Steady', 'Careful', 'Prudent'],
-      balanced: ['Smart', 'Balanced', 'Wise']
-    };
-
-    const difficultyNouns = {
-      easy: ['Novice', 'Beginner', 'Rookie'],
-      medium: ['Player', 'Trader', 'Investor'],
-      hard: ['Expert', 'Master', 'Pro']
-    };
-
-    const adjectives = strategyAdjectives[strategy as keyof typeof strategyAdjectives] || strategyAdjectives.balanced;
-    const nouns = difficultyNouns[difficulty as keyof typeof difficultyNouns] || difficultyNouns.medium;
-
-    const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const noun = nouns[Math.floor(Math.random() * nouns.length)];
-
-    return `${adjective} ${noun}`;
+  private static async getOwnedProperties(bot: Player): Promise<Property[]> {
+    return await dbService.getPropertiesByOwnerId(bot.id);
   }
 
-  static async makeDecision(
+  private static shouldBotBuyProperty(bot: Player, price: number, ownedProperties: Property[]): boolean {
+    // Get bot's strategy and difficulty
+    const strategy = bot.bot_strategy || 'balanced';
+    const difficulty = bot.bot_difficulty || 'medium';
+
+    // Define thresholds based on strategy and difficulty
+    let buyThreshold = 0.3; // Default threshold
+    let maxOwnershipPercentage = 0.5; // Default max ownership
+
+    // Adjust thresholds based on strategy
+    switch (strategy) {
+      case 'aggressive':
+        buyThreshold = 0.5;
+        maxOwnershipPercentage = 0.8;
+        break;
+      case 'conservative':
+        buyThreshold = 0.2;
+        maxOwnershipPercentage = 0.3;
+        break;
+      case 'balanced':
+        buyThreshold = 0.3;
+        maxOwnershipPercentage = 0.5;
+        break;
+    }
+
+    // Adjust thresholds based on difficulty
+    switch (difficulty) {
+      case 'easy':
+        buyThreshold *= 0.8;
+        maxOwnershipPercentage *= 0.8;
+        break;
+      case 'hard':
+        buyThreshold *= 1.2;
+        maxOwnershipPercentage *= 1.2;
+        break;
+    }
+
+    // Count total purchasable properties
+    const totalProperties = BOARD_SPACES.filter(
+      space => space.type === 'property' || space.type === 'railroad' || space.type === 'utility'
+    ).length;
+
+    // Calculate current ownership percentage
+    const currentOwnershipPercentage = ownedProperties.length / totalProperties;
+
+    // Check both price threshold and ownership percentage
+    return price <= bot.balance * buyThreshold && 
+           currentOwnershipPercentage < maxOwnershipPercentage;
+  }
+
+  public static async makeDecision(
     bot: Player,
     gameState: GameState,
     currentProperty: Property | null,
-    allProperties: Property[]
+    properties: Property[]
   ): Promise<BotDecision> {
-    // If no property to act on, end turn
-    if (!currentProperty) {
-      return { action: 'end_turn' };
-    }
+    // Get bot's owned properties
+    const ownedProperties = await this.getOwnedProperties(bot);
 
-    // If property is owned by someone else, pay rent
-    if (currentProperty.owner_id && currentProperty.owner_id !== bot.id) {
-      return {
-        action: 'pay_rent',
-        property: currentProperty
-      };
-    }
-
-    // If property is unowned, decide whether to buy based on strategy
-    if (!currentProperty.owner_id) {
-      const propertyData = BOARD_SPACES.find(space => space.position === currentProperty.position);
-      if (!propertyData || !('price' in propertyData)) {
-        return { action: 'pass' };
-      }
-
-      const price = propertyData.price as number;
-      const shouldBuy = this.shouldBotBuyProperty(bot, price);
-
-      if (shouldBuy && bot.balance >= price) {
+    if (currentProperty && !currentProperty.ownerId) {
+      // Decision to buy property
+      if (this.shouldBotBuyProperty(bot, currentProperty.price, ownedProperties)) {
         return {
           action: 'buy',
           property: currentProperty
@@ -66,36 +81,29 @@ export class BotService {
       }
     }
 
-    // Default to ending turn
+    // Default to ending turn if no other action is needed
     return { action: 'end_turn' };
   }
 
-  private static shouldBotBuyProperty(bot: Player, price: number): boolean {
-    // Default to balanced strategy
-    let buyThreshold = 0.3; // Will buy if price is less than 30% of balance
+  public static generateBotName(strategy: string, difficulty: string): string {
+    const strategyNames = {
+      aggressive: ['Risky', 'Bold', 'Daring'],
+      conservative: ['Careful', 'Prudent', 'Wise'],
+      balanced: ['Smart', 'Balanced', 'Steady']
+    };
 
-    switch (bot.bot_strategy) {
-      case 'aggressive':
-        buyThreshold = 0.5; // Will buy if price is less than 50% of balance
-        break;
-      case 'conservative':
-        buyThreshold = 0.2; // Will buy if price is less than 20% of balance
-        break;
-      case 'balanced':
-      default:
-        buyThreshold = 0.3;
-    }
+    const difficultyNames = {
+      easy: ['Rookie', 'Novice', 'Beginner'],
+      medium: ['Player', 'Trader', 'Dealer'],
+      hard: ['Expert', 'Master', 'Pro']
+    };
 
-    // Adjust threshold based on difficulty
-    switch (bot.bot_difficulty) {
-      case 'easy':
-        buyThreshold *= 0.8; // 20% less likely to buy
-        break;
-      case 'hard':
-        buyThreshold *= 1.2; // 20% more likely to buy
-        break;
-    }
+    const strategyList = strategyNames[strategy as keyof typeof strategyNames] || strategyNames.balanced;
+    const difficultyList = difficultyNames[difficulty as keyof typeof difficultyNames] || difficultyNames.medium;
 
-    return price <= bot.balance * buyThreshold;
+    const strategyName = strategyList[Math.floor(Math.random() * strategyList.length)];
+    const difficultyName = difficultyList[Math.floor(Math.random() * difficultyList.length)];
+
+    return `${strategyName} ${difficultyName}`;
   }
 } 

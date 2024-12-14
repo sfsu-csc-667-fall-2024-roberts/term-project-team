@@ -2,13 +2,14 @@ import express, { Request, Response, Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { pool } from '../db/config';
 import { getGame, getGamePlayers, getGameProperties, buyProperty, getPropertyByPosition, payRent } from '../db/services/dbService';
-import { Game, GameState } from '../db/models/types';
+import { Game, Player } from '../db/models/types';
 import { BOARD_SPACES } from '../../shared/boardData';
 import { BotService } from '../services/botService';
 import session from 'express-session';
 import { CardActionService } from '../services/cardActionService';
 import { RentCalculationService } from '../services/rentCalculationService';
-import { Card, BoardSpace } from '../../shared/types';
+import { Card, BoardSpace, GameState, GamePhase, GameAction, GameStateUpdate, JailAction, SpaceAction, Property } from '../../shared/types';
+import * as dbService from '../db/services/dbService';
 
 type TypedSession = session.Session & {
   userId?: number;
@@ -18,14 +19,98 @@ type TypedSession = session.Session & {
 
 const router: Router = express.Router();
 
-async function updatePropertyState(propertyId: number, updates: Partial<{ mortgaged: boolean }>) {
+const JAIL_POSITION = 10;
+const JAIL_FINE = 50;
+const MAX_JAIL_TURNS = 3;
+
+// Move ExtendedBoardSpace interface to the top of the file
+interface ExtendedBoardSpace extends BoardSpace {
+  rentLevels?: number[];
+  houseCost?: number;
+  hotelCost?: number;
+  mortgageValue?: number;
+  colorGroup?: string;
+  price?: number;
+  type: 'property' | 'railroad' | 'utility' | 'tax' | 'corner' | 'chance' | 'chest';
+}
+
+// 1. First, let's define the DB property type to match the database schema
+interface DBProperty {
+  game_id: number;
+  position: number;
+  name: string;
+  type: 'property' | 'railroad' | 'utility';
+  price: number;
+  rent_levels: number[];
+  house_cost: number;
+  hotel_cost: number;
+  mortgage_value: number;
+  color_group: string;
+  owner_id: number | null;
+  house_count: number;
+  is_mortgaged: boolean;
+  has_hotel: boolean;
+}
+
+function handleJailTurn(gameState: GameState, playerId: number, dice: [number, number]): JailAction {
+  const jailTurns = gameState.jail_turns[playerId] || 0;
+  const isDoubles = dice[0] === dice[1];
+  
+  if (isDoubles) {
+    gameState.jail_turns[playerId] = 0;
+    return {
+      type: 'jail_action',
+      action: 'roll_doubles',
+      success: true,
+      message: 'Rolled doubles! You are free from jail!'
+    };
+  }
+  
+  if (jailTurns >= MAX_JAIL_TURNS - 1) {
+    // Force payment on third turn
+    gameState.jail_turns[playerId] = 0;
+    // TODO: Deduct money from player
+    return {
+      type: 'jail_action',
+      action: 'pay_fine',
+      success: true,
+      message: `Forced to pay ${JAIL_FINE}$ fine after three turns.`
+    };
+  }
+  
+  gameState.jail_turns[playerId] = jailTurns + 1;
+  return {
+    type: 'jail_action',
+    action: 'roll_doubles',
+    success: false,
+    message: `Failed to roll doubles. ${MAX_JAIL_TURNS - (jailTurns + 1)} turns remaining in jail.`
+  };
+}
+
+function isInJail(gameState: GameState, playerId: number): boolean {
+  return (gameState.jail_turns[playerId] || 0) > 0;
+}
+
+async function updatePropertyState(propertyId: number, updates: Partial<DBProperty>) {
   const updateFields = [];
   const values = [];
   let paramCount = 1;
 
-  if (updates.mortgaged !== undefined) {
-    updateFields.push(`mortgaged = $${paramCount}`);
-    values.push(updates.mortgaged);
+  if (updates.is_mortgaged !== undefined) {
+    updateFields.push(`is_mortgaged = $${paramCount}`);
+    values.push(updates.is_mortgaged);
+    paramCount++;
+  }
+
+  if (updates.owner_id !== undefined) {
+    updateFields.push(`owner_id = $${paramCount}`);
+    values.push(updates.owner_id);
+    paramCount++;
+  }
+
+  if (updates.house_count !== undefined) {
+    updateFields.push(`house_count = $${paramCount}`);
+    values.push(updates.house_count);
     paramCount++;
   }
 
@@ -79,11 +164,14 @@ router.get('/:id/state', requireAuth, async (req: Request, res: Response): Promi
     }
 
     // Initialize game state if it doesn't exist
-    let gameState = game.game_state || {
+    let gameState: GameState = game.game_state || {
       phase: 'waiting',
       current_player_index: 0,
       dice_rolls: [],
-      turn_order: []
+      turn_order: [],
+      doubles_count: 0,
+      jail_turns: {},
+      bankrupt_players: []
     };
 
     // Ensure game state has all required properties
@@ -91,7 +179,19 @@ router.get('/:id/state', requireAuth, async (req: Request, res: Response): Promi
       phase: gameState.phase || 'waiting',
       current_player_index: typeof gameState.current_player_index === 'number' ? gameState.current_player_index : 0,
       dice_rolls: Array.isArray(gameState.dice_rolls) ? gameState.dice_rolls : [],
-      turn_order: Array.isArray(gameState.turn_order) ? gameState.turn_order : []
+      turn_order: Array.isArray(gameState.turn_order) ? gameState.turn_order : [],
+      doubles_count: gameState.doubles_count || 0,
+      jail_turns: gameState.jail_turns || {},
+      bankrupt_players: gameState.bankrupt_players || [],
+      last_roll: gameState.last_roll,
+      last_dice: gameState.last_dice,
+      last_doubles: gameState.last_doubles,
+      last_position: gameState.last_position,
+      drawn_card: gameState.drawn_card,
+      jail_free_cards: gameState.jail_free_cards || {},
+      current_property_decision: gameState.current_property_decision,
+      current_rent_owed: gameState.current_rent_owed,
+      winner: gameState.winner
     };
 
     res.json({
@@ -144,7 +244,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     }
 
     // Sort players: humans first, then bots
-    const sortedPlayers = [...players].sort((a, b) => {
+    const sortedPlayers = [...players].sort((a: Player, b: Player) => {
       if (a.is_bot === b.is_bot) return 0;
       return a.is_bot ? 1 : -1;
     });
@@ -154,7 +254,10 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       phase: 'waiting',
       current_player_index: 0,
       dice_rolls: [],
-      turn_order: []
+      turn_order: [],
+      doubles_count: 0,
+      jail_turns: {},
+      bankrupt_players: []
     };
 
     // Ensure game state has all required properties
@@ -162,7 +265,19 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       phase: gameState.phase || 'waiting',
       current_player_index: typeof gameState.current_player_index === 'number' ? gameState.current_player_index : 0,
       dice_rolls: Array.isArray(gameState.dice_rolls) ? gameState.dice_rolls : [],
-      turn_order: Array.isArray(gameState.turn_order) ? gameState.turn_order : []
+      turn_order: Array.isArray(gameState.turn_order) ? gameState.turn_order : [],
+      doubles_count: gameState.doubles_count || 0,
+      jail_turns: gameState.jail_turns || {},
+      bankrupt_players: gameState.bankrupt_players || [],
+      last_roll: gameState.last_roll,
+      last_dice: gameState.last_dice,
+      last_doubles: gameState.last_doubles,
+      last_position: gameState.last_position,
+      drawn_card: gameState.drawn_card,
+      jail_free_cards: gameState.jail_free_cards || {},
+      current_property_decision: gameState.current_property_decision,
+      current_rent_owed: gameState.current_rent_owed,
+      winner: gameState.winner
     };
 
     console.log('Rendering game view:', {
@@ -193,20 +308,20 @@ router.post('/:id/roll', requireAuth, async (req: Request, res: Response): Promi
   try {
     await client.query('BEGIN');
 
-    const gameId = parseInt(req.params.id);
+    currentGameId = parseInt(req.params.id);
     const typedSession = req.session as TypedSession;
     const userId = typedSession.userId!;
     const botId = req.body.botId ? parseInt(req.body.botId) : undefined;
 
     // Get game and validate
-    const game = await getGame(gameId);
+    const game = await getGame(currentGameId);
     if (!game) {
       res.status(404).json({ error: 'Game not found' });
       return;
     }
 
     // Get current player
-    const players = await getGamePlayers(gameId);
+    const players = await getGamePlayers(currentGameId);
     let currentPlayer;
     
     if (botId) {
@@ -279,13 +394,26 @@ router.post('/:id/roll', requireAuth, async (req: Request, res: Response): Promi
       }
 
       // Update game state
-      await client.query('UPDATE games SET game_state = $1 WHERE id = $2', [gameState, gameId]);
+      await client.query('UPDATE games SET game_state = $1 WHERE id = $2', [gameState, currentGameId]);
       
       await client.query('COMMIT');
       res.json({ roll: totalRoll, dice: [dice1, dice2], isDoubles, gameState, players });
     } else if (gameState.phase === 'playing') {
-      // Move player
+      // Get current position before moving
+      const oldPosition = currentPlayer.position;
+      
+      // Calculate new position
       const newPosition = (currentPlayer.position + totalRoll) % 40;
+
+      // Check if passed GO (player moved from higher number to lower number, excluding jail movement)
+      if (newPosition < oldPosition && !isDoubles) {
+        // Award $200 for passing GO
+        await client.query(
+          'UPDATE players SET balance = balance + $1 WHERE id = $2',
+          [200, currentPlayer.id]
+        );
+        console.log(`Player ${currentPlayer.username} passed GO, awarded $200`);
+      }
 
       // Update player position in database
       await client.query(
@@ -294,7 +422,7 @@ router.post('/:id/roll', requireAuth, async (req: Request, res: Response): Promi
       );
 
       // Get updated player data
-      let updatedPlayers = await getGamePlayers(gameId);
+      let updatedPlayers = await getGamePlayers(currentGameId);
       let updatedCurrentPlayer = updatedPlayers.find(p => p.id === currentPlayer.id);
 
       if (!updatedCurrentPlayer) {
@@ -330,7 +458,12 @@ router.post('/:id/roll', requireAuth, async (req: Request, res: Response): Promi
       if (spaceData) {
         if (spaceData.type === 'chance' || spaceData.type === 'chest') {
           // Create card action service
-          const cardService = new CardActionService(gameId, updatedPlayers, gameState, await getGameProperties(gameId));
+          const cardService = new CardActionService(
+            currentGameId,
+            updatedPlayers,
+            gameState,
+            await getGameProperties(currentGameId)
+          );
           
           // Draw a card
           const card = spaceData.type === 'chance' ? drawChanceCard() : drawCommunityChestCard();
@@ -366,7 +499,7 @@ router.post('/:id/roll', requireAuth, async (req: Request, res: Response): Promi
           );
 
           // Get updated player data
-          updatedPlayers = await getGamePlayers(gameId);
+          updatedPlayers = await getGamePlayers(currentGameId);
           updatedCurrentPlayer = updatedPlayers.find(p => p.id === currentPlayer.id);
 
           spaceAction = {
@@ -380,19 +513,19 @@ router.post('/:id/roll', requireAuth, async (req: Request, res: Response): Promi
           console.log('Created tax action:', spaceAction);
         } else if (spaceData.type === 'property' || spaceData.type === 'railroad' || spaceData.type === 'utility') {
           // Check if property exists and is unowned
-          const property = await getPropertyByPosition(gameId, newPosition);
+          const property = await getPropertyByPosition(currentGameId, newPosition);
           console.log('Property database state:', { 
             property,
             exists: !!property,
-            isOwned: !!property?.owner_id,
-            ownerInfo: property?.owner_id ? 'Owned' : 'Unowned',
+            isOwned: !!property?.ownerId,
+            ownerInfo: property?.ownerId ? 'Owned' : 'Unowned',
             propertyPrice: property?.price || spaceData.price,
             spaceType: spaceData.type,
             canAfford: currentPlayer.balance >= (property?.price || spaceData.price || 0)
           });
           
           // Property exists and is unowned
-          if (property && !property.owner_id) {
+          if (property && !property.ownerId) {
             spaceAction = {
               type: 'purchase_available',
               property: {
@@ -404,69 +537,71 @@ router.post('/:id/roll', requireAuth, async (req: Request, res: Response): Promi
               }
             };
             console.log('Creating purchase action:', spaceAction);
-          } else if (property && property.owner_id && property.owner_id !== currentPlayer.id) {
+          } else if (property && property.ownerId && property.ownerId !== currentPlayer.id) {
             // Property is owned by another player - need to pay rent
-            const rentService = new RentCalculationService(await getGameProperties(gameId), updatedPlayers);
+            const rentService = new RentCalculationService(await getGameProperties(currentGameId), updatedPlayers);
             let rentAmount = rentService.calculateRent(property);
             
-            // For utilities, use the dice roll
-            if (spaceData.type === 'utility') {
-              rentAmount *= totalRoll;
-            }
-            
-            spaceAction = {
-              type: 'pay_rent',
-              property: {
-                ...property,
-                type: spaceData.type,
-                price: spaceData.price,
-                rentAmount
-              }
+            // Process rent payment
+            const rentResult = await dbService.processRentPayment(
+              currentGameId,
+              currentPlayer.id,
+              property.ownerId!,
+              rentAmount
+            );
+
+            // Update game state
+            gameState.current_rent_owed = {
+              amount: rentAmount,
+              from: currentPlayer.id,
+              to: property.ownerId,
+              property
             };
-            console.log('Created rent action:', spaceAction);
 
             // Update player balances
-            const owner = updatedPlayers.find(p => p.id === property.owner_id);
+            currentPlayer.balance = rentResult.payerBalance;
+            const owner = updatedPlayers.find(p => p.id === property.ownerId);
             if (owner) {
-              // Deduct rent from current player
-              await client.query(
-                'UPDATE players SET balance = balance - $1 WHERE id = $2',
-                [rentAmount, currentPlayer.id]
-              );
-
-              // Add rent to owner's balance
-              await client.query(
-                'UPDATE players SET balance = balance + $1 WHERE id = $2',
-                [rentAmount, owner.id]
-              );
-
-              // Get updated player data
-              updatedPlayers = await getGamePlayers(gameId);
-              updatedCurrentPlayer = updatedPlayers.find(p => p.id === currentPlayer.id);
+              owner.balance = rentResult.ownerBalance;
             }
+
+            // Update UI message
+            spaceAction = {
+              type: 'pay_rent',
+              property,
+              message: `Paid $${rentAmount} rent to ${owner?.username || 'owner'}`
+            };
           } else if (!property) {
             // Property doesn't exist in database, create it
+            console.log('Creating new property in database:', {
+              position: newPosition,
+              spaceData
+            });
+
             try {
-              await client.query(
-                'INSERT INTO properties (game_id, position, name, owner_id, house_count, mortgaged, price) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                [gameId, newPosition, spaceData.name, null, 0, false, spaceData.price]
-              );
-              console.log('Created unowned property in database');
-              
-              // Set purchase action for the newly created property
+              const newProperty = await dbService.createProperty(currentGameId, {
+                position: newPosition,
+                name: spaceData.name,
+                type: spaceData.type as 'property' | 'railroad' | 'utility',
+                price: spaceData.price || 0,
+                rentLevels: spaceData.rentLevels || [],
+                houseCost: spaceData.houseCost || 0,
+                hotelCost: spaceData.hotelCost || 0,
+                mortgageValue: spaceData.mortgageValue || 0,
+                colorGroup: spaceData.colorGroup || '',
+                ownerId: null,
+                houseCount: 0,
+                isMortgaged: false,
+                hasHotel: false
+              });
+
               spaceAction = {
                 type: 'purchase_available',
-                property: {
-                  ...spaceData,
-                  price: spaceData.price,
-                  position: newPosition,
-                  name: spaceData.name,
-                  type: spaceData.type
-                }
+                property: newProperty
               };
-              console.log('Creating purchase action for new property:', spaceAction);
             } catch (error) {
               console.error('Error creating property:', error);
+              spaceAction = { type: 'property_action' };
             }
           }
         }
@@ -477,10 +612,10 @@ router.post('/:id/roll', requireAuth, async (req: Request, res: Response): Promi
       gameState.last_dice = [dice1, dice2];
       gameState.last_doubles = isDoubles;
       gameState.last_position = newPosition;
-      await client.query('UPDATE games SET game_state = $1 WHERE id = $2', [gameState, gameId]);
+      await client.query('UPDATE games SET game_state = $1 WHERE id = $2', [gameState, currentGameId]);
 
       // Get final updated data
-      updatedPlayers = await getGamePlayers(gameId);
+      updatedPlayers = await getGamePlayers(currentGameId);
       updatedCurrentPlayer = updatedPlayers.find(p => p.id === currentPlayer.id);
 
       if (!updatedCurrentPlayer) {
@@ -738,37 +873,61 @@ router.post('/:id/property/buy', requireAuth, async (req: Request, res: Response
       return;
     }
 
-    // Try to buy the property
-    try {
-      console.log('Attempting to buy property:', {
-        gameId,
-        position,
-        playerId: currentPlayer.id,
-        playerBalance: currentPlayer.balance
-      });
+    // Remove nested try-catch and handle errors at transaction level
+    console.log('Attempting to buy property:', {
+      gameId,
+      position,
+      playerId: currentPlayer.id,
+      playerBalance: currentPlayer.balance
+    });
 
-      const result = await buyProperty(gameId, position, currentPlayer.id);
-      console.log('Property purchase successful:', result);
-      
-      // Get updated game data
-      const updatedPlayers = await getGamePlayers(gameId);
-      const updatedProperties = await getGameProperties(gameId);
-
-      await client.query('COMMIT');
-      res.json({
-        success: true,
-        property: result,
-        players: updatedPlayers,
-        properties: updatedProperties
-      });
-    } catch (error) {
-      console.error('Property purchase failed:', error);
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to buy property' });
+    // Get property first to validate
+    const property = await getPropertyByPosition(gameId, position);
+    if (!property) {
+      throw new Error('Property not available for purchase');
     }
+
+    if (property.ownerId !== null) {
+      throw new Error('Property already owned');
+    }
+
+    if (currentPlayer.balance < property.price) {
+      throw new Error('Not enough money to buy property');
+    }
+
+    // Perform the purchase
+    const result = await buyProperty(gameId, position, currentPlayer.id);
+    console.log('Property purchase successful:', result);
+    
+    // Get updated game data
+    const updatedPlayers = await getGamePlayers(gameId);
+    const updatedProperties = await getGameProperties(gameId);
+
+    await client.query('COMMIT');
+    res.json({
+      success: true,
+      property: result,
+      players: updatedPlayers,
+      properties: updatedProperties
+    });
+
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Buy property error:', error);
-    res.status(500).json({ error: 'Failed to process property purchase' });
+    
+    // Send appropriate error response based on error type
+    if (error instanceof Error) {
+      const statusCode = 
+        error.message.includes('Not enough money') ? 400 :
+        error.message.includes('Property not available') ? 400 :
+        error.message.includes('Property already owned') ? 400 :
+        error.message.includes('Not your turn') ? 403 : 
+        500;
+        
+      res.status(statusCode).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to process property purchase' });
+    }
   } finally {
     client.release();
   }
@@ -814,10 +973,22 @@ router.post('/:id/property/build', requireAuth, async (req: Request, res: Respon
     }
 
     // Validate ownership
-    if (property.owner_id !== currentPlayer.id) {
+    if (property.ownerId !== currentPlayer.id) {
       res.status(403).json({ error: 'You do not own this property' });
       return;
     }
+
+    // Get building cost from board data
+    const spaceData = BOARD_SPACES[property.position] as BoardSpace;
+    if (!spaceData || !spaceData.houseCost) {
+      res.status(400).json({ error: 'Invalid property or building cost not defined' });
+      return;
+    }
+
+    // Calculate building cost based on type
+    const buildingCost = buildType === 'hotel' ? 
+      (spaceData.hotelCost || spaceData.houseCost * 5) : // Hotel costs 5x house cost if not specified
+      spaceData.houseCost;
 
     // Create rent service to validate building
     const rentService = new RentCalculationService(properties, players);
@@ -838,20 +1009,20 @@ router.post('/:id/property/build', requireAuth, async (req: Request, res: Respon
       return;
     }
 
-    // Get building cost from board data
-    const spaceData = BOARD_SPACES[property.position] as BoardSpace;
-    const buildingCost = spaceData.houseCost || 100; // Default to 100 if not specified
-
     // Check if player can afford it
     if (currentPlayer.balance < buildingCost) {
-      res.status(400).json({ error: 'Insufficient funds' });
+      res.status(400).json({ 
+        error: 'Insufficient funds', 
+        required: buildingCost,
+        balance: currentPlayer.balance
+      });
       return;
     }
 
     // Update property
     await client.query(
       'UPDATE properties SET house_count = $1 WHERE id = $2',
-      [buildType === 'hotel' ? 5 : property.house_count + 1, propertyId]
+      [buildType === 'hotel' ? 5 : property.houseCount + 1, propertyId]
     );
 
     // Deduct cost from player
@@ -921,13 +1092,13 @@ router.post('/:id/property/mortgage', requireAuth, async (req: Request, res: Res
     }
 
     // Validate ownership
-    if (property.owner_id !== currentPlayer.id) {
+    if (property.ownerId !== currentPlayer.id) {
       res.status(403).json({ error: 'You do not own this property' });
       return;
     }
 
     // Cannot mortgage property with houses
-    if (property.house_count > 0) {
+    if (property.houseCount > 0) {
       res.status(400).json({ error: 'Cannot mortgage property with houses. Sell houses first.' });
       return;
     }
@@ -942,19 +1113,19 @@ router.post('/:id/property/mortgage', requireAuth, async (req: Request, res: Res
     const mortgageValue = Math.floor(spaceData.price / 2);
 
     if (action === 'mortgage') {
-      if (property.mortgaged) {
+      if (property.isMortgaged) {
         res.status(400).json({ error: 'Property is already mortgaged' });
         return;
       }
 
       // Update property and add money to player
-      await updatePropertyState(propertyId, { mortgaged: true });
+      await updatePropertyState(propertyId, { is_mortgaged: true });
       await client.query(
         'UPDATE players SET balance = balance + $1 WHERE id = $2',
         [mortgageValue, currentPlayer.id]
       );
     } else if (action === 'unmortgage') {
-      if (!property.mortgaged) {
+      if (!property.isMortgaged) {
         res.status(400).json({ error: 'Property is not mortgaged' });
         return;
       }
@@ -968,7 +1139,7 @@ router.post('/:id/property/mortgage', requireAuth, async (req: Request, res: Res
       }
 
       // Update property and deduct money from player
-      await updatePropertyState(propertyId, { mortgaged: false });
+      await updatePropertyState(propertyId, { is_mortgaged: false });
       await client.query(
         'UPDATE players SET balance = balance - $1 WHERE id = $2',
         [unmortgageCost, currentPlayer.id]
@@ -1189,6 +1360,524 @@ function drawCommunityChestCard(): Card {
   ];
   
   return communityChestCards[Math.floor(Math.random() * communityChestCards.length)];
+}
+
+// Game state transitions
+async function handleGameAction(state: GameState, action: GameAction): Promise<GameStateUpdate> {
+  const currentPlayer = state.turn_order[state.current_player_index];
+  
+  try {
+    switch (action.type) {
+      case 'roll': {
+        if (state.phase !== 'rolling' || action.playerId !== currentPlayer) {
+          return {
+            type: 'state_update',
+            state,
+            message: 'Invalid action: Not your turn to roll'
+          };
+        }
+        
+        // Handle roll logic here
+        const dice: [number, number] = [
+          Math.floor(Math.random() * 6) + 1,
+          Math.floor(Math.random() * 6) + 1
+        ];
+        const roll = dice[0] + dice[1];
+        const isDoubles = dice[0] === dice[1];
+        
+        // Update state with roll
+        state.last_roll = roll;
+        state.last_dice = dice;
+        state.last_doubles = isDoubles;
+        
+        // Handle jail
+        if (isInJail(state, currentPlayer)) {
+          const jailAction = handleJailTurn(state, currentPlayer, dice);
+          if (!jailAction.success) {
+            return advanceTurn(state);
+          }
+        }
+        
+        // Handle doubles
+        if (isDoubles) {
+          state.doubles_count++;
+          if (state.doubles_count >= 3) {
+            sendToJail(state, currentPlayer);
+            return advanceTurn(state);
+          }
+        } else {
+          state.doubles_count = 0;
+        }
+        
+        // Move player
+        const newPosition = calculateNewPosition(state.last_position || 0, roll);
+        state.last_position = newPosition;
+        
+        // Handle landing on space
+        const spaceAction = await handleLandOnSpace(state, currentPlayer, newPosition);
+        if (spaceAction) {
+          switch (spaceAction.type) {
+            case 'purchase_available':
+              state.phase = 'property_decision';
+              state.current_property_decision = spaceAction.property as Property;
+              break;
+            case 'pay_rent':
+              state.phase = 'paying_rent';
+              if (spaceAction.property && 'ownerId' in spaceAction.property) {
+                const propertyWithOwner = spaceAction.property as Property;
+                if (propertyWithOwner.ownerId !== null) {
+                  const rentAmount = await calculateRent(propertyWithOwner);
+                  state.current_rent_owed = {
+                    amount: rentAmount,
+                    to: propertyWithOwner.ownerId,
+                    from: currentPlayer,
+                    property: propertyWithOwner
+                  };
+                }
+              }
+              break;
+            case 'go_to_jail':
+              sendToJail(state, currentPlayer);
+              return advanceTurn(state);
+          }
+        }
+        
+        return {
+          type: 'state_update',
+          state,
+          message: `Rolled ${roll} (${dice[0]}, ${dice[1]})`
+        };
+      }
+      
+      case 'purchase': {
+        if (state.phase !== 'property_decision' || action.playerId !== currentPlayer) {
+          return {
+            type: 'state_update',
+            state,
+            message: 'Invalid action: Cannot purchase property now'
+          };
+        }
+        
+        const property = state.current_property_decision;
+        if (!property) {
+          return {
+            type: 'state_update',
+            state,
+            message: 'No property available for purchase'
+          };
+        }
+
+        // Purchase the property
+        await buyProperty(currentGameId, property.position, currentPlayer);
+        state.current_property_decision = undefined;
+        
+        if (!state.last_doubles) {
+          return advanceTurn(state);
+        } else {
+          state.phase = 'rolling';
+          return {
+            type: 'state_update',
+            state,
+            message: `Purchased ${property.name}`
+          };
+        }
+      }
+      
+      case 'pay_rent': {
+        if (state.phase !== 'paying_rent' || action.playerId !== currentPlayer) {
+          return {
+            type: 'state_update',
+            state,
+            message: 'Invalid action: Cannot pay rent now'
+          };
+        }
+        
+        const rent = state.current_rent_owed;
+        if (!rent) {
+          return {
+            type: 'state_update',
+            state,
+            message: 'No rent to pay'
+          };
+        }
+
+        // Process rent payment
+        await payRent(currentGameId, currentPlayer, rent.property.position);
+        state.current_rent_owed = undefined;
+        
+        if (!state.last_doubles) {
+          return advanceTurn(state);
+        } else {
+          state.phase = 'rolling';
+          return {
+            type: 'state_update',
+            state,
+            message: `Paid $${rent.amount} rent to Player ${rent.to}`
+          };
+        }
+      }
+      
+      case 'declare_bankruptcy': {
+        handleBankruptcy(state, action.playerId);
+        if (shouldEndGame(state)) {
+          endGame(state);
+        }
+        return {
+          type: 'state_update',
+          state,
+          message: `Player ${action.playerId} declared bankruptcy`
+        };
+      }
+      
+      case 'end_turn': {
+        if (action.playerId !== currentPlayer) {
+          return {
+            type: 'state_update',
+            state,
+            message: 'Invalid action: Not your turn'
+          };
+        }
+        return advanceTurn(state);
+      }
+
+      default:
+        return {
+          type: 'state_update',
+          state,
+          message: 'Invalid action'
+        };
+    }
+  } catch (error) {
+    console.error('Error handling game action:', error);
+    return {
+      type: 'state_update',
+      state,
+      message: 'Error processing action'
+    };
+  }
+}
+
+function advanceTurn(state: GameState): GameStateUpdate {
+  state.current_player_index = (state.current_player_index + 1) % state.turn_order.length;
+  state.phase = 'rolling';
+  state.last_doubles = false;
+  state.doubles_count = 0;
+  
+  // Skip bankrupt players
+  while (state.bankrupt_players.includes(state.turn_order[state.current_player_index])) {
+    state.current_player_index = (state.current_player_index + 1) % state.turn_order.length;
+  }
+  
+  return {
+    type: 'state_update',
+    state,
+    message: `Player ${state.turn_order[state.current_player_index]}'s turn`
+  };
+}
+
+function handleBankruptcy(state: GameState, playerId: number) {
+  state.bankrupt_players.push(playerId);
+  
+  // Transfer all properties to bank or creditor
+  // TODO: Implement property transfer logic
+}
+
+function shouldEndGame(state: GameState): boolean {
+  const activePlayers = state.turn_order.filter(id => !state.bankrupt_players.includes(id));
+  return activePlayers.length === 1;
+}
+
+function endGame(state: GameState) {
+  state.phase = 'game_over';
+  state.winner = state.turn_order.find(id => !state.bankrupt_players.includes(id))!;
+}
+
+// Update existing routes to use new game flow
+router.post('/action', async (req: Request, res: Response) => {
+  try {
+    const { action } = req.body;
+    const gameId = parseInt(req.params.id);
+    const gameState = await getGameState(gameId);
+    
+    if (!gameState) {
+      res.status(404).json({ error: 'Game not found' });
+      return;
+    }
+    
+    const update = await handleGameAction(gameState, action);
+    await dbService.updateGameState(gameId, update.state);
+    res.json(update);
+  } catch (error) {
+    console.error('Error handling game action:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Helper functions
+function sendToJail(gameState: GameState, playerId: number): void {
+  gameState.jail_turns[playerId] = 1;
+}
+
+function calculateNewPosition(currentPosition: number, roll: number): number {
+  const newPosition = (currentPosition + roll) % 40;
+  return newPosition;
+}
+
+async function handleLandOnSpace(gameState: GameState, playerId: number, position: number): Promise<SpaceAction> {
+  const boardSpace = BOARD_SPACES[position] as ExtendedBoardSpace;
+  
+  try {
+    switch (boardSpace.type) {
+      case 'property':
+      case 'railroad':
+      case 'utility': {
+        const spaceAction = await handlePropertySpace(gameState, playerId, position);
+        return spaceAction;
+      }
+      case 'tax':
+        return handleTaxSpace(gameState, playerId, position);
+      case 'chance':
+      case 'chest':
+        return await handleCardSpace(gameState, playerId, boardSpace.type);
+      case 'corner':
+        if (boardSpace.name === 'Jail') {
+          sendToJail(gameState, playerId);
+          return { type: 'go_to_jail' };
+        }
+        return { type: 'property_action' };
+      default:
+        return { type: 'property_action' };
+    }
+  } catch (error) {
+    console.error('Error in handleLandOnSpace:', error);
+    return { type: 'property_action' };
+  }
+}
+
+async function calculateRent(property: Property, dice?: [number, number]): Promise<number> {
+  const [properties, players] = await Promise.all([
+    getGameProperties(currentGameId),
+    getGamePlayers(currentGameId)
+  ]);
+  const rentCalculationService = new RentCalculationService(properties, players);
+  return rentCalculationService.calculateRent(property);
+}
+
+let currentGameId: number;
+
+async function handlePropertySpace(gameState: GameState, playerId: number, position: number): Promise<SpaceAction> {
+  const boardSpace = BOARD_SPACES[position];
+  if (!boardSpace || !['property', 'railroad', 'utility'].includes(boardSpace.type)) {
+    return { type: 'property_action' };
+  }
+
+  try {
+    const dbProperty = await getPropertyByPosition(currentGameId, position);
+    if (!dbProperty) {
+      // Convert boardSpace to Property type
+      const propertyData: Partial<Property> = {
+        gameId: currentGameId,
+        position: boardSpace.position,
+        name: boardSpace.name,
+        type: boardSpace.type as 'property' | 'railroad' | 'utility',
+        price: boardSpace.price || 0,
+        rentLevels: boardSpace.rentLevels || [],
+        houseCost: boardSpace.houseCost || 0,
+        hotelCost: boardSpace.hotelCost || 0,
+        mortgageValue: boardSpace.mortgageValue || 0,
+        colorGroup: boardSpace.colorGroup || '',
+        ownerId: null,
+        houseCount: 0,
+        isMortgaged: false,
+        hasHotel: false
+      };
+      
+      const newProperty = await createProperty(currentGameId, propertyData);
+      return {
+        type: 'purchase_available',
+        property: newProperty
+      };
+    }
+
+    if (!dbProperty.ownerId) {
+      return {
+        type: 'purchase_available',
+        property: dbProperty
+      };
+    }
+
+    if (dbProperty.ownerId !== playerId && !dbProperty.isMortgaged) {
+      const rentAmount = await calculateRent(dbProperty);
+      return {
+        type: 'pay_rent',
+        property: dbProperty,
+        message: `Pay $${rentAmount} rent to ${dbProperty.ownerId}`
+      };
+    }
+
+    return { type: 'property_action' };
+  } catch (error) {
+    console.error('Error in handlePropertySpace:', error);
+    return { type: 'property_action' };
+  }
+}
+
+function handleTaxSpace(gameState: GameState, playerId: number, position: number): SpaceAction {
+  const boardSpace = BOARD_SPACES[position];
+  const taxAmount = boardSpace.type === 'tax' ? (boardSpace.price || 0) : 0;
+  
+  return {
+    type: 'property_action',
+    message: `Pay $${taxAmount} in tax`
+  };
+}
+
+async function handleCardSpace(gameState: GameState, playerId: number, cardType: 'chance' | 'chest'): Promise<SpaceAction> {
+  const [properties, players] = await Promise.all([
+    getGameProperties(currentGameId),
+    getGamePlayers(currentGameId)
+  ]);
+  const cardActionService = new CardActionService(currentGameId, players, gameState, properties);
+  const card = cardType === 'chance' ? drawChanceCard() : drawCommunityChestCard();
+  gameState.drawn_card = card;
+  return {
+    type: 'card_drawn',
+    card,
+    message: card.text
+  };
+}
+
+// Update game state
+router.post('/:id/state', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const gameId = parseInt(req.params.id);
+    const gameState = await getGameState(gameId);
+    
+    if (!gameState) {
+      res.status(404).json({ error: 'Game not found' });
+      return;
+    }
+
+    await dbService.updateGameState(gameId, gameState);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Update game state error:', error);
+    res.status(500).json({ error: 'Failed to update game state' });
+  }
+});
+
+// Helper function to get game state
+async function getGameState(gameId: number): Promise<GameState | null> {
+  const game = await getGame(gameId);
+  if (!game) return null;
+  return game.game_state;
+}
+
+// Fix property field references in property purchase
+router.post('/:id/purchase', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    currentGameId = parseInt(req.params.id);
+    const position = parseInt(req.body.position);
+    const typedSession = req.session as TypedSession;
+    const userId = typedSession.userId!;
+
+    // Get game and validate
+    const game = await getGame(currentGameId);
+    if (!game) {
+      res.status(404).json({ error: 'Game not found' });
+      return;
+    }
+
+    // Get current player
+    const players = await getGamePlayers(currentGameId);
+    const currentPlayer = players.find(p => p.user_id === userId);
+    if (!currentPlayer) {
+      res.status(403).json({ error: 'Not in game' });
+      return;
+    }
+
+    // Get property
+    const property = await getPropertyByPosition(currentGameId, position);
+    if (!property || property.ownerId !== null) {
+      res.status(400).json({ error: 'Property not available for purchase' });
+      return;
+    }
+
+    // Check if player can afford property
+    if (currentPlayer.balance < property.price) {
+      res.status(400).json({ error: 'Insufficient funds' });
+      return;
+    }
+
+    // Update property owner
+    await dbService.updatePropertyState(property.id, {
+      ownerId: currentPlayer.id,
+      houseCount: 0,
+      isMortgaged: false
+    });
+
+    // Update player balance
+    await client.query(
+      'UPDATE players SET balance = balance - $1 WHERE id = $2',
+      [property.price, currentPlayer.id]
+    );
+
+    await client.query('COMMIT');
+
+    // Get updated data
+    const [updatedPlayers, updatedProperties] = await Promise.all([
+      getGamePlayers(currentGameId),
+      getGameProperties(currentGameId)
+    ]);
+
+    res.json({
+      success: true,
+      players: updatedPlayers,
+      properties: updatedProperties,
+      message: `Successfully purchased ${property.name} for $${property.price}`
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Property purchase error:', error);
+    res.status(500).json({ error: 'Failed to purchase property' });
+  } finally {
+    client.release();
+  }
+});
+
+// Fix createProperty to use DBProperty type
+async function createProperty(gameId: number, propertyData: Partial<Property>): Promise<Property> {
+  try {
+    // Ensure all required fields are present
+    if (!propertyData.position || !propertyData.name || !propertyData.type) {
+      throw new Error('Missing required property fields');
+    }
+
+    const propertyToCreate: Partial<Property> = {
+      gameId,
+      position: propertyData.position,
+      name: propertyData.name,
+      type: propertyData.type,
+      price: propertyData.price || 0,
+      rentLevels: propertyData.rentLevels || [],
+      houseCost: propertyData.houseCost || 0,
+      hotelCost: propertyData.hotelCost || 0,
+      mortgageValue: propertyData.mortgageValue || 0,
+      colorGroup: propertyData.colorGroup || '',
+      ownerId: null,
+      houseCount: 0,
+      isMortgaged: false,
+      hasHotel: false
+    };
+
+    return await dbService.createProperty(gameId, propertyToCreate);
+  } catch (error) {
+    console.error('Error creating property:', error);
+    throw error;
+  }
 }
 
 export default router; 

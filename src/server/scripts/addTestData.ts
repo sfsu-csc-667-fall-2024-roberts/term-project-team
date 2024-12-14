@@ -1,53 +1,39 @@
-import { 
-  createUser, 
-  createGame, 
-  addPlayerToGame, 
-  createProperty,
-  getUserByUsername 
-} from '../db/services/dbService';
+import { pool } from '../db/config';
 import bcrypt from 'bcrypt';
 
 async function addTestData() {
+  const client = await pool.connect();
   try {
-    // 1. Create a test user
-    const username = 'testuser';
-    const password = 'password123';
-    const hashedPassword = await bcrypt.hash(password, 10);
+    await client.query('BEGIN');
+
+    // Check if test user exists
+    const testUserCheck = await client.query('SELECT * FROM users WHERE username = $1', ['test']);
     
-    // Check if user already exists
-    let user = await getUserByUsername(username);
-    if (!user) {
-      user = await createUser(username, hashedPassword);
-      console.log('Created User:', { ...user, hashed_password: '[HIDDEN]' });
+    if (!testUserCheck.rows[0]) {
+      console.log('Creating test user...');
+      const hashedPassword = await bcrypt.hash('test', 10);
+      const testUser = await client.query(
+        'INSERT INTO users (username, hashed_password) VALUES ($1, $2) RETURNING *',
+        ['test', hashedPassword]
+      );
+      console.log('Test user created:', testUser.rows[0]);
     } else {
-      console.log('Using existing user:', { ...user, hashed_password: '[HIDDEN]' });
+      console.log('Test user already exists:', testUserCheck.rows[0]);
     }
 
-    // 2. Create a game owned by that user
-    const game = await createGame(user.id);
-    console.log('Created Game:', game);
-
-    // 3. Add the user as a player in that game
-    const player = await addPlayerToGame(game.id, user.id);
-    console.log('Created Player:', player);
-
-    // 4. Add some sample properties to the game
-    const properties = await Promise.all([
-      createProperty(game.id, 'Mediterranean Avenue'),
-      createProperty(game.id, 'Baltic Avenue'),
-      createProperty(game.id, 'Reading Railroad')
-    ]);
-    console.log('Created Properties:', properties);
-
-    console.log('\nTest data added successfully!');
-    process.exit(0);
+    await client.query('COMMIT');
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error adding test data:', error);
-    process.exit(1);
+    throw error;
+  } finally {
+    client.release();
+    await pool.end();
   }
 }
 
-// Run if this file is executed directly
-if (require.main === module) {
-  addTestData();
-} 
+addTestData()
+  .catch(error => {
+    console.error('Failed to add test data:', error);
+    process.exit(1);
+  }); 

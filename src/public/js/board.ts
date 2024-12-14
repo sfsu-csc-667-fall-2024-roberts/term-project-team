@@ -1,11 +1,32 @@
 import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
 import { Property } from './types';
 
-class MonopolyBoard {
+export default class MonopolyBoard {
   private container: HTMLElement;
   private playerTokens: Map<number, HTMLElement>;
-  private propertyOwnership: Map<number, number>;
-  private playerColors = ['#90EE90', '#FFB6C1', '#87CEEB', '#DDA0DD'];
+  private propertyOwnership: Map<number, HTMLElement>;
+  private playerColors = {
+    base: [
+      '#E53935', // Red
+      '#43A047', // Green
+      '#1E88E5', // Blue
+      '#FDD835', // Yellow
+      '#8E24AA', // Purple
+      '#00ACC1', // Cyan
+      '#FB8C00', // Orange
+      '#6D4C41'  // Brown
+    ],
+    highlight: [
+      '#FFCDD2', // Light Red
+      '#C8E6C9', // Light Green
+      '#BBDEFB', // Light Blue
+      '#FFF9C4', // Light Yellow
+      '#E1BEE7', // Light Purple
+      '#B2EBF2', // Light Cyan
+      '#FFE0B2', // Light Orange
+      '#D7CCC8'  // Light Brown
+    ]
+  };
   private currentPlayerId: number = -1;
 
   constructor(containerId: string) {
@@ -119,7 +140,7 @@ class MonopolyBoard {
     if (!token) {
       token = document.createElement('div');
       token.className = 'player-token';
-      token.style.backgroundColor = this.playerColors[playerIndex % this.playerColors.length];
+      token.style.backgroundColor = this.playerColors.base[playerIndex % this.playerColors.base.length];
       token.style.width = '20px';
       token.style.height = '20px';
       token.style.borderRadius = '50%';
@@ -132,6 +153,7 @@ class MonopolyBoard {
       this.playerTokens.set(playerId, token);
     }
 
+    // Update token position directly without any intermediate positions
     const space = this.container.querySelector(`[data-position="${position}"]`) as HTMLElement;
     if (!space) {
       console.error(`Space not found for position ${position}`);
@@ -162,9 +184,6 @@ class MonopolyBoard {
         relativeX += (col * 20);
         relativeY += (row * 20);
       }
-      
-      token.style.left = `${relativeX}px`;
-      token.style.top = `${relativeY}px`;
     } else {
       // For regular spaces, arrange tokens with offset
       const side = Math.floor(position / 10); // 0: bottom, 1: left, 2: top, 3: right
@@ -189,50 +208,107 @@ class MonopolyBoard {
       }
     }
 
+    // Set token position
+    token.style.left = `${relativeX}px`;
+    token.style.top = `${relativeY}px`;
+
     // Highlight current player's token
     if (this.currentPlayerId === playerId) {
       token.style.transform = 'scale(1.2)';
-      token.style.boxShadow = '0 0 10px rgba(255,255,0,0.5)';
+      token.style.boxShadow = `0 0 10px ${this.playerColors.highlight[playerIndex % this.playerColors.highlight.length]}`;
+      token.style.backgroundColor = this.playerColors.base[playerIndex % this.playerColors.base.length];
     } else {
       token.style.transform = 'scale(1)';
       token.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+      token.style.backgroundColor = this.playerColors.base[playerIndex % this.playerColors.base.length];
     }
-
-    console.log(`Token positioned at ${token.style.left}, ${token.style.top}`);
   }
 
   public updatePropertyOwnership(property: Property, ownerIndex: number): void {
-    const spaceElement = this.container.querySelector(`.pos-${property.position}`) as HTMLElement;
-    if (spaceElement) {
-      // Remove any existing ownership indicators
-      const existingIndicator = spaceElement.querySelector('.property-owner-indicator');
-      if (existingIndicator) {
-        existingIndicator.remove();
-      }
-
-      if (property.owner_id !== null && property.owner_id !== undefined) {
-        const indicator = document.createElement('div');
-        indicator.className = `property-owner-indicator owner-${ownerIndex}`;
-        spaceElement.appendChild(indicator);
-      }
-
-      this.propertyOwnership.set(property.position, property.owner_id || -1);
+    // Remove existing ownership marker if any
+    const existingMarker = this.propertyOwnership.get(property.position);
+    if (existingMarker) {
+      existingMarker.remove();
     }
+
+    // Create new ownership marker
+    const marker = document.createElement('div');
+    marker.className = 'property-ownership-marker';
+    marker.style.backgroundColor = this.playerColors.base[ownerIndex % this.playerColors.base.length];
+    marker.style.width = '10px';
+    marker.style.height = '10px';
+    marker.style.borderRadius = '50%';
+    marker.style.position = 'absolute';
+    marker.style.zIndex = '50';
+    marker.style.border = '1px solid #000';
+    marker.style.boxShadow = '0 0 2px rgba(0,0,0,0.3)';
+
+    // Find the space element
+    const spaceElement = this.container.querySelector(`[data-position="${property.position}"]`) as HTMLElement;
+    if (!spaceElement) {
+      console.error(`Space element not found for position ${property.position}`);
+      return;
+    }
+
+    // Position the marker
+    const spaceRect = spaceElement.getBoundingClientRect();
+    const boardRect = this.container.getBoundingClientRect();
+    const side = Math.floor(property.position / 10); // 0: bottom, 1: left, 2: top, 3: right
+
+    // Calculate marker position based on the side of the board
+    let left: number;
+    let top: number;
+
+    switch (side) {
+      case 0: // Bottom row
+        left = spaceRect.left - boardRect.left + 5;
+        top = spaceRect.top - boardRect.top + 5;
+        break;
+      case 1: // Left column
+        left = spaceRect.right - boardRect.left - 15;
+        top = spaceRect.top - boardRect.top + 5;
+        break;
+      case 2: // Top row
+        left = spaceRect.left - boardRect.left + 5;
+        top = spaceRect.bottom - boardRect.top - 15;
+        break;
+      case 3: // Right column
+        left = spaceRect.left - boardRect.left + 5;
+        top = spaceRect.top - boardRect.top + 5;
+        break;
+      default:
+        left = spaceRect.left - boardRect.left + 5;
+        top = spaceRect.top - boardRect.top + 5;
+    }
+
+    marker.style.left = `${left}px`;
+    marker.style.top = `${top}px`;
+
+    // Add marker to the board and store reference
+    this.container.appendChild(marker);
+    this.propertyOwnership.set(property.position, marker);
   }
 
   public setCurrentPlayer(playerId: number): void {
     this.currentPlayerId = playerId;
     // Update token highlighting for all players
     this.playerTokens.forEach((token, tokenPlayerId) => {
+      const playerIndex = Array.from(this.playerTokens.keys()).indexOf(tokenPlayerId);
       if (tokenPlayerId === playerId) {
         token.style.transform = 'scale(1.2)';
-        token.style.boxShadow = '0 0 10px rgba(255,255,0,0.5)';
+        token.style.boxShadow = `0 0 10px ${this.playerColors.highlight[playerIndex % this.playerColors.highlight.length]}`;
       } else {
         token.style.transform = 'scale(1)';
         token.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
       }
     });
   }
-}
 
-export default MonopolyBoard; 
+  public getPlayerColor(index: number): string {
+    return this.playerColors.base[index % this.playerColors.base.length];
+  }
+
+  public getPlayerHighlightColor(index: number): string {
+    return this.playerColors.highlight[index % this.playerColors.highlight.length];
+  }
+} 

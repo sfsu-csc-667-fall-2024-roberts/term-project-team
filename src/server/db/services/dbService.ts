@@ -32,10 +32,10 @@ async function initializeGameProperties(gameId: number, client: any): Promise<vo
   
   // Initialize properties from board data
   for (const space of BOARD_SPACES) {
-    if (space.type === 'property') {
+    if (space.type === 'property' || space.type === 'railroad' || space.type === 'utility') {
       await client.query(
-        'INSERT INTO properties (game_id, position, name, owner_id, house_count, mortgaged) VALUES ($1, $2, $3, $4, $5, $6)',
-        [gameId, space.position, space.name, null, 0, false]
+        'INSERT INTO properties (game_id, position, name, owner_id, house_count, mortgaged, price) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [gameId, space.position, space.name, null, 0, false, space.price]
       );
     }
   }
@@ -67,14 +67,14 @@ export async function createGame(ownerId: number): Promise<Game> {
     );
     const game = gameResult.rows[0];
 
+    // Initialize properties for the game
+    await initializeGameProperties(game.id, client);
+
     // Add owner as first player with username
     await client.query(
       'INSERT INTO players (game_id, user_id, username, is_bot, balance, position) VALUES ($1, $2, $3, $4, $5, $6)',
       [game.id, ownerId, user.username, false, 1500, 0]
     );
-
-    // Initialize game properties
-    await initializeGameProperties(game.id, client);
 
     await client.query('COMMIT');
     return game;
@@ -295,16 +295,25 @@ export async function buyProperty(gameId: number, position: number, playerId: nu
   try {
     await client.query('BEGIN');
 
+    console.log('Starting property purchase:', {
+      gameId,
+      position,
+      playerId
+    });
+
     // Get the property details from board data
     const propertyData = BOARD_SPACES.find((space: BoardSpace) => space.position === position);
-    if (!propertyData || propertyData.type !== 'property' || !propertyData.price) {
+    if (!propertyData || !['property', 'railroad', 'utility'].includes(propertyData.type) || !propertyData.price) {
+      console.error('Invalid property data:', { propertyData, position });
       throw new Error('Invalid property position or not a purchasable property');
     }
 
-    // Check if property already exists
-    let property = await getPropertyByPosition(gameId, position);
+    // Check if property exists and is unowned
+    const property = await getPropertyByPosition(gameId, position);
+    console.log('Found property:', property);
     
-    if (property) {
+    if (property && property.owner_id !== null) {
+      console.error('Property already owned:', property);
       throw new Error('Property already owned');
     }
 
@@ -315,19 +324,32 @@ export async function buyProperty(gameId: number, position: number, playerId: nu
     );
 
     if (playerResult.rows.length === 0) {
+      console.error('Player not found:', { gameId, playerId });
       throw new Error('Player not found');
     }
 
     const playerBalance = playerResult.rows[0].balance;
     if (playerBalance < propertyData.price) {
+      console.error('Insufficient funds:', { playerBalance, price: propertyData.price });
       throw new Error('Insufficient funds');
     }
 
-    // Create new property
-    const propertyResult = await client.query(
-      'INSERT INTO properties (game_id, name, owner_id, position) VALUES ($1, $2, $3, $4) RETURNING *',
-      [gameId, propertyData.name, playerId, position]
-    );
+    let updatedProperty;
+    if (property) {
+      // Update existing property
+      console.log('Updating existing property:', property);
+      updatedProperty = await client.query(
+        'UPDATE properties SET owner_id = $1, updated_at = NOW() WHERE game_id = $2 AND position = $3 RETURNING *',
+        [playerId, gameId, position]
+      );
+    } else {
+      // Create new property
+      console.log('Creating new property:', propertyData);
+      updatedProperty = await client.query(
+        'INSERT INTO properties (game_id, name, owner_id, position, price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [gameId, propertyData.name, playerId, position, propertyData.price]
+      );
+    }
 
     // Deduct money from player
     const updateResult = await client.query(
@@ -335,14 +357,20 @@ export async function buyProperty(gameId: number, position: number, playerId: nu
       [propertyData.price, gameId, playerId]
     );
 
+    console.log('Purchase completed:', {
+      property: updatedProperty.rows[0],
+      newBalance: updateResult.rows[0].balance
+    });
+
     await client.query('COMMIT');
     
     return {
-      ...propertyResult.rows[0],
+      ...updatedProperty.rows[0],
       newBalance: updateResult.rows[0].balance
     };
   } catch (error) {
     await client.query('ROLLBACK');
+    console.error('Property purchase error:', error);
     throw error;
   } finally {
     client.release();

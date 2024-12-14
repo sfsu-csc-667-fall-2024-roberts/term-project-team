@@ -295,3 +295,160 @@ body {
         margin-top: 1.5rem;
     }
 } 
+
+/* Properties Panel */
+.properties-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.properties-section h2 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.player-properties,
+.unowned-properties {
+  margin-bottom: 1.5rem;
+}
+
+.player-properties h3,
+.unowned-properties h3 {
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.player-properties ul,
+.unowned-properties ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.player-properties li,
+.unowned-properties li {
+  padding: 0.5rem;
+  border-radius: 4px;
+  background: #f8f9fa;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.player-properties li:hover,
+.unowned-properties li:hover {
+  background: #e9ecef;
+}
+
+.no-properties {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 1rem;
+} 
+
+.properties-list {
+  padding: 15px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.player-properties {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.player-properties h3 {
+  margin: 0 0 10px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid;
+  font-size: 1.2em;
+}
+
+.player-properties ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.player-properties li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  margin: 5px 0;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border-left: 4px solid;
+}
+
+.property-info {
+  flex: 1;
+}
+
+.property-name {
+  font-weight: bold;
+  display: block;
+}
+
+.property-details {
+  font-size: 0.9em;
+  color: #666;
+}
+
+.property-controls {
+  display: flex;
+  gap: 8px;
+  margin-left: 10px;
+}
+
+.build-controls, .mortgage-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.unowned-properties {
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.unowned-properties h3 {
+  margin: 0 0 10px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #ddd;
+  font-size: 1.2em;
+}
+
+.unowned-properties ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.unowned-properties li {
+  padding: 8px;
+  margin: 5px 0;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border-left: 4px solid #ddd;
+}
+
+/* Property color coding */
+.property-color-brown { border-left-color: #8B4513; }
+.property-color-light-blue { border-left-color: #87CEEB; }
+.property-color-pink { border-left-color: #FF69B4; }
+.property-color-orange { border-left-color: #FFA500; }
+.property-color-red { border-left-color: #FF0000; }
+.property-color-yellow { border-left-color: #FFD700; }
+.property-color-green { border-left-color: #008000; }
+.property-color-blue { border-left-color: #0000FF; }
+.property-color-railroad { border-left-color: #000000; }
+.property-color-utility { border-left-color: #808080; } 

@@ -41,7 +41,7 @@
               <p class="position">Position: <%= player.position %></p>
               <p class="roll-status">
                 <% if (gameState.phase === 'waiting') { %>
-                  <% const roll = gameState.dice_rolls.find(r => r.playerId === player.id); %>
+                  <% const roll = gameState.dice_rolls.find(r => r.id === player.id); %>
                   <%= roll ? `Initial Roll: ${roll.roll}` : 'Waiting for roll...' %>
                 <% } else { %>
                   <%= player.id === currentPlayerId ? 'Current turn' : 'Waiting for turn...' %>

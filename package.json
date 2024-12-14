@@ -13,7 +13,14 @@
     "prepare": "husky install",
     "migrate": "ts-node src/server/db/migrations/runMigrations.ts",
     "test:data": "ts-node src/server/scripts/addTestData.ts",
-    "dev:start": "npm run build && npm start"
+    "dev:start": "npm run build && npm start",
+    "db:reset": "ts-node src/server/scripts/resetDb.ts",
+    "dev:reset": "npm run db:reset && npm run dev:start",
+    "cleanup:livereload": "lsof -ti:35729 | xargs kill -9 || true",
+    "logs:clear": "clear",
+    "dev:clean": "npm run cleanup:livereload && npm run logs:clear && npm run dev:start",
+    "db:fresh": "npm run db:reset && npm run migrate",
+    "dev:fresh": "npm run db:fresh && npm run dev:clean"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

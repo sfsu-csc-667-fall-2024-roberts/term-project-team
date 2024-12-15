@@ -40,13 +40,15 @@ router.post('/games', requireAuth, async (req, res) => {
     const typedSession = req.session as TypedSession;
     const userId = typedSession.userId;
     
-    console.log('Request details:', {
+    console.log('Session details:', {
+      sessionId: req.sessionID,
       userId,
-      body: req.body,
+      username: typedSession.username,
       session: typedSession
     });
 
     if (!userId) {
+      console.error('No user ID in session');
       throw new Error('Not authenticated');
     }
 
@@ -66,7 +68,25 @@ router.post('/games', requireAuth, async (req, res) => {
     if (!userCheck.rows[0]) {
       // Additional check - list all users in database
       const allUsers = await client.query('SELECT id, username FROM users');
-      console.log('All users in database:', allUsers.rows);
+      console.error('User not found in database. All users:', allUsers.rows);
+      
+      // Check if session is stale
+      if (typedSession.username) {
+        const userByUsername = await client.query('SELECT * FROM users WHERE username = $1', [typedSession.username]);
+        if (userByUsername.rows[0]) {
+          console.log('Found user by username, updating session userId');
+          typedSession.userId = userByUsername.rows[0].id;
+          await new Promise<void>((resolve, reject) => {
+            req.session.save((err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          // Retry with corrected userId
+          return res.redirect(307, '/games');
+        }
+      }
+      
       throw new Error(`User ${userId} not found in database`);
     }
 

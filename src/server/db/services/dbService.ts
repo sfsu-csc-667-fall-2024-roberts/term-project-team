@@ -87,53 +87,70 @@ export async function createGame(ownerId: number, client: DatabaseClient = pool)
   try {
     if (shouldManageTransaction) {
       await dbClient.query('BEGIN');
+      console.log('Transaction started for game creation');
     }
 
     // Check if user exists and get username
+    console.log('Checking user existence:', { ownerId });
     const userResult = await dbClient.query('SELECT * FROM users WHERE id = $1', [ownerId]);
     const user = userResult.rows[0];
+    
     if (!user) {
       console.error('User not found in database:', { ownerId });
       const allUsers = await dbClient.query('SELECT id, username FROM users');
       console.error('All users in database:', allUsers.rows);
       throw new Error(`User ${ownerId} not found`);
     }
+    
+    console.log('User found:', { userId: user.id, username: user.username });
 
     // Create game with initial game state
     const initialGameState = {
       phase: 'waiting',
       current_player_index: 0,
       dice_rolls: [],
-      turn_order: []
+      turn_order: [],
+      doubles_count: 0,
+      jail_turns: {},
+      bankrupt_players: []
     };
 
+    console.log('Creating new game with state:', initialGameState);
     const gameResult = await dbClient.query(
       'INSERT INTO games (owner_id, status, game_state) VALUES ($1, $2, $3) RETURNING *',
       [ownerId, 'waiting', initialGameState]
     );
     const game = gameResult.rows[0];
+    console.log('Game created:', { gameId: game.id, ownerId: game.owner_id });
 
     // Initialize properties for the game
+    console.log('Initializing properties for game:', { gameId: game.id });
     await initializeGameProperties(game.id, dbClient);
+    console.log('Properties initialized successfully');
 
     // Add owner as first player with username
-    await dbClient.query(
-      'INSERT INTO players (game_id, user_id, username, is_bot, balance, position) VALUES ($1, $2, $3, $4, $5, $6)',
+    console.log('Adding owner as first player:', { gameId: game.id, userId: ownerId, username: user.username });
+    const playerResult = await dbClient.query(
+      'INSERT INTO players (game_id, user_id, username, is_bot, balance, position) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [game.id, ownerId, user.username, false, 1500, 0]
     );
+    console.log('Owner added as player:', playerResult.rows[0]);
 
     if (shouldManageTransaction) {
       await dbClient.query('COMMIT');
+      console.log('Transaction committed successfully');
     }
     return game;
   } catch (error) {
     if (shouldManageTransaction) {
       await dbClient.query('ROLLBACK');
+      console.error('Transaction rolled back due to error:', error);
     }
     throw error;
   } finally {
     if (shouldManageTransaction && 'release' in dbClient) {
       dbClient.release();
+      console.log('Database client released');
     }
   }
 }

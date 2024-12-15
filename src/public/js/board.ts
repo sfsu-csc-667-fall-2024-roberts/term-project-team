@@ -108,11 +108,6 @@ export default class MonopolyBoard {
       spaceElement.classList.add('space-railroad');
     } else if (space.type === 'utility') {
       spaceElement.classList.add('space-utility');
-      if (space.name.includes('Water')) {
-        spaceElement.classList.add('water-works');
-      } else if (space.name.includes('Electric')) {
-        spaceElement.classList.add('electric-company');
-      }
     } else if (space.type === 'tax') {
       spaceElement.classList.add('space-tax');
     } else if (space.type === 'chance') {
@@ -122,20 +117,39 @@ export default class MonopolyBoard {
     } else if (space.type === 'corner') {
       spaceElement.classList.add('space-corner');
       // Add corner-specific classes
-      if (space.position === 0) spaceElement.classList.add('bottom-right');
+      if (space.position === 0) {
+        spaceElement.classList.add('bottom-right');
+        // Special GO space content
+        const content = document.createElement('div');
+        content.className = 'space-content';
+        
+        const name = document.createElement('div');
+        name.className = 'space-name';
+        name.textContent = space.name;
+        content.appendChild(name);
+        
+        const action = document.createElement('div');
+        action.className = 'space-action';
+        action.textContent = 'COLLECT $200';
+        content.appendChild(action);
+        
+        spaceElement.appendChild(content);
+        return spaceElement;
+      }
       if (space.position === 10) spaceElement.classList.add('bottom-left');
       if (space.position === 20) spaceElement.classList.add('top-left');
       if (space.position === 30) spaceElement.classList.add('top-right');
     }
 
-    // Add space content
+    // Add space content for non-GO spaces
     const content = document.createElement('div');
     content.className = 'space-content';
 
     // Add color bar for properties
     if (space.type === 'property' && space.color) {
       const colorBar = document.createElement('div');
-      colorBar.className = `property-color-bar ${space.color}`;
+      colorBar.className = 'property-color-bar';
+      colorBar.style.backgroundColor = this.getColorForProperty(space.color);
       content.appendChild(colorBar);
     }
 
@@ -349,5 +363,19 @@ export default class MonopolyBoard {
 
   public getPlayerHighlightColor(index: number): string {
     return this.playerColors.highlight[index % this.playerColors.highlight.length];
+  }
+
+  private getColorForProperty(color: string): string {
+    const colorMap: { [key: string]: string } = {
+      'brown': '#955436',
+      'light-blue': '#AAE0FA',
+      'pink': '#D93A96',
+      'orange': '#F7941D',
+      'red': '#ED1B24',
+      'yellow': '#FEF200',
+      'green': '#1FB25A',
+      'blue': '#0072BB'
+    };
+    return colorMap[color] || '#ffffff';
   }
 } 

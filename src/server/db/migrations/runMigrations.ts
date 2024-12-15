@@ -27,15 +27,25 @@ async function runMigrations() {
     }
   } catch (error) {
     console.error('Migration failed:', error);
-    process.exit(1);
-  } finally {
-    await pool.end();
+    throw error;
   }
 }
 
 // Run migrations if this file is executed directly
 if (require.main === module) {
-  runMigrations();
+  runMigrations()
+    .catch(error => {
+      console.error('Failed to run migrations:', error);
+      process.exit(1);
+    })
+    .finally(async () => {
+      try {
+        await pool.end();
+      } catch (error) {
+        console.error('Error closing pool:', error);
+      }
+      process.exit(0);
+    });
 }
 
 export default runMigrations; 

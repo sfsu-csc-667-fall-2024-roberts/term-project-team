@@ -7,6 +7,9 @@
   border: 2px solid #000;
   background: #C5FFC5;
   margin: auto;
+  --total-spaces: 11; /* 9 regular spaces + 2 corners per side */
+  --space-size: calc(100% / var(--total-spaces));
+  --corner-size: var(--space-size);
 }
 
 .board-wrapper {
@@ -19,14 +22,14 @@
 /* Board spaces - unified styling for ALL spaces */
 .board-space {
   position: absolute;
-  width: 10%;
-  height: 10%;
   background: #fff;
   border: 1px solid #000;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   padding: 0;
+  width: var(--space-size);
+  height: var(--space-size);
 }
 
 /* Space content wrapper - unified for ALL spaces */
@@ -36,32 +39,153 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* Changed to flex-start to align content from top */
+  justify-content: space-between;
   padding: 2px;
   font-size: 0.6rem;
   text-align: center;
 }
 
-/* Corner spaces - now following same format as properties */
+/* Corner spaces base styling */
 .space-corner {
+  position: absolute;
+  width: var(--corner-size);
+  height: var(--corner-size);
+  background: #fff;
+  border: 1px solid #000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 4px;
   font-weight: bold;
+  text-align: center;
 }
 
+/* GO space styling */
+.pos-0 {
+  background-color: #28a745;
+  color: white;
+  border: 2px solid #1e7e34;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+  z-index: 2;
+}
+
+/* Jail styling */
+.pos-10 {
+  background-color: #dc3545;
+  color: white;
+  border: 2px solid #bd2130;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+  z-index: 2;
+}
+
+/* Free Parking styling */
+.pos-20 {
+  background-color: #ffc107;
+  color: black;
+  border: 2px solid #d39e00;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+  z-index: 2;
+}
+
+/* Go to Jail styling */
+.pos-30 {
+  background-color: #17a2b8;
+  color: white;
+  border: 2px solid #138496;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+  z-index: 2;
+}
+
+/* Corner space content */
 .space-corner .space-content {
-  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .space-corner .space-name {
-  font-size: 0.7rem;
-  margin-top: 2px;
-  width: 100%;
+  font-size: 0.8rem;
+  margin: 0;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
 }
 
 .space-corner .space-action {
-  font-size: 0.6rem;
-  margin-bottom: 2px;
-  width: 100%;
+  font-size: 0.7rem;
+  margin-top: 4px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
 }
+
+/* Position classes for corners */
+.pos-0 { right: 0; bottom: 0; }
+.pos-10 { left: 0; bottom: 0; }
+.pos-20 { left: 0; top: 0; }
+.pos-30 { right: 0; top: 0; }
+
+/* Board center adjustment */
+.board-center {
+  position: absolute;
+  top: var(--space-size);
+  left: var(--space-size);
+  right: var(--space-size);
+  bottom: var(--space-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #C5FFC5;
+  border: 2px solid #000;
+  box-sizing: border-box;
+  z-index: 1;
+}
+
+/* Position classes - Counter-clockwise from GO */
+/* Bottom row (left to right) */
+.pos-1 { right: var(--space-size); bottom: 0; }
+.pos-2 { right: calc(var(--space-size) * 2); bottom: 0; }
+.pos-3 { right: calc(var(--space-size) * 3); bottom: 0; }
+.pos-4 { right: calc(var(--space-size) * 4); bottom: 0; }
+.pos-5 { right: calc(var(--space-size) * 5); bottom: 0; }
+.pos-6 { right: calc(var(--space-size) * 6); bottom: 0; }
+.pos-7 { right: calc(var(--space-size) * 7); bottom: 0; }
+.pos-8 { right: calc(var(--space-size) * 8); bottom: 0; }
+.pos-9 { right: calc(var(--space-size) * 9); bottom: 0; }
+
+/* Left column (bottom to top) */
+.pos-11 { left: 0; bottom: var(--space-size); }
+.pos-12 { left: 0; bottom: calc(var(--space-size) * 2); }
+.pos-13 { left: 0; bottom: calc(var(--space-size) * 3); }
+.pos-14 { left: 0; bottom: calc(var(--space-size) * 4); }
+.pos-15 { left: 0; bottom: calc(var(--space-size) * 5); }
+.pos-16 { left: 0; bottom: calc(var(--space-size) * 6); }
+.pos-17 { left: 0; bottom: calc(var(--space-size) * 7); }
+.pos-18 { left: 0; bottom: calc(var(--space-size) * 8); }
+.pos-19 { left: 0; bottom: calc(var(--space-size) * 9); }
+
+/* Top row (left to right) */
+.pos-21 { left: var(--space-size); top: 0; }
+.pos-22 { left: calc(var(--space-size) * 2); top: 0; }
+.pos-23 { left: calc(var(--space-size) * 3); top: 0; }
+.pos-24 { left: calc(var(--space-size) * 4); top: 0; }
+.pos-25 { left: calc(var(--space-size) * 5); top: 0; }
+.pos-26 { left: calc(var(--space-size) * 6); top: 0; }
+.pos-27 { left: calc(var(--space-size) * 7); top: 0; }
+.pos-28 { left: calc(var(--space-size) * 8); top: 0; }
+.pos-29 { left: calc(var(--space-size) * 9); top: 0; }
+
+/* Right column (top to bottom) */
+.pos-31 { right: 0; top: var(--space-size); }
+.pos-32 { right: 0; top: calc(var(--space-size) * 2); }
+.pos-33 { right: 0; top: calc(var(--space-size) * 3); }
+.pos-34 { right: 0; top: calc(var(--space-size) * 4); }
+.pos-35 { right: 0; top: calc(var(--space-size) * 5); }
+.pos-36 { right: 0; top: calc(var(--space-size) * 6); }
+.pos-37 { right: 0; top: calc(var(--space-size) * 7); }
+.pos-38 { right: 0; top: calc(var(--space-size) * 8); }
+.pos-39 { right: 0; top: calc(var(--space-size) * 9); }
 
 /* Property color bars */
 .property-color-bar {
@@ -99,80 +223,11 @@
   width: 100%;
 }
 
-/* Position classes */
-/* Bottom row - 11 spaces (0-10) */
-.pos-0 { left: 90%; bottom: 0; } /* GO */
-.pos-1 { left: 80%; bottom: 0; }
-.pos-2 { left: 70%; bottom: 0; }
-.pos-3 { left: 60%; bottom: 0; }
-.pos-4 { left: 50%; bottom: 0; }
-.pos-5 { left: 40%; bottom: 0; }
-.pos-6 { left: 30%; bottom: 0; }
-.pos-7 { left: 20%; bottom: 0; }
-.pos-8 { left: 10%; bottom: 0; }
-.pos-9 { left: 0; bottom: 0; }
-.pos-10 { left: 0; bottom: 0; } /* Jail */
-
-/* Left column - 9 spaces (11-19) */
-.pos-11 { left: 0; bottom: 90%; }
-.pos-12 { left: 0; bottom: 80%; }
-.pos-13 { left: 0; bottom: 70%; }
-.pos-14 { left: 0; bottom: 60%; }
-.pos-15 { left: 0; bottom: 50%; }
-.pos-16 { left: 0; bottom: 40%; }
-.pos-17 { left: 0; bottom: 30%; }
-.pos-18 { left: 0; bottom: 20%; }
-.pos-19 { left: 0; bottom: 10%; }
-.pos-20 { left: 0; top: 0; } /* Free Parking */
-
-/* Top row - 9 spaces (21-29) */
-.pos-21 { left: 10%; top: 0; }
-.pos-22 { left: 20%; top: 0; }
-.pos-23 { left: 30%; top: 0; }
-.pos-24 { left: 40%; top: 0; }
-.pos-25 { left: 50%; top: 0; }
-.pos-26 { left: 60%; top: 0; }
-.pos-27 { left: 70%; top: 0; }
-.pos-28 { left: 80%; top: 0; }
-.pos-29 { left: 90%; top: 0; }
-.pos-30 { right: 0; top: 0; } /* Go to Jail */
-
-/* Right column - 9 spaces (31-39) */
-.pos-31 { right: 0; top: 10%; }
-.pos-32 { right: 0; top: 20%; }
-.pos-33 { right: 0; top: 30%; }
-.pos-34 { right: 0; top: 40%; }
-.pos-35 { right: 0; top: 50%; }
-.pos-36 { right: 0; top: 60%; }
-.pos-37 { right: 0; top: 70%; }
-.pos-38 { right: 0; top: 80%; }
-.pos-39 { right: 0; top: 90%; }
-
-/* Board center */
-.board-center {
-  position: absolute;
-  top: 10%;
-  left: 10%;
-  right: 10%;
-  bottom: 10%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #C5FFC5;
-  border: 2px solid #000;
-  box-sizing: border-box;
-  z-index: 1;
-}
-
-.board-center-monopoly {
-  font-size: 4rem;
-  font-weight: bold;
-  color: #000;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-  white-space: nowrap;
-  text-align: center;
-  transform: rotate(-45deg);
-}
+/* Corner colors */
+.space-corner.bottom-right { background-color: #28a745; color: white; } /* GO */
+.space-corner.bottom-left { background-color: #dc3545; color: white; }  /* Jail */
+.space-corner.top-left { background-color: #ffc107; color: black; }     /* Free Parking */
+.space-corner.top-right { background-color: #17a2b8; color: white; }    /* Go to Jail */
 
 /* Property colors */
 .brown { background-color: #955436; }
@@ -190,12 +245,6 @@
 .space-tax { background: #FFE4E1; }
 .space-chance { background: #FFDAB9; }
 .space-chest { background: #E6E6FA; }
-
-/* Corner colors */
-.space-corner.bottom-right { background-color: #28a745; color: white; } /* GO */
-.space-corner.bottom-left { background-color: #dc3545; color: white; }  /* Jail */
-.space-corner.top-left { background-color: #ffc107; color: black; }     /* Free Parking */
-.space-corner.top-right { background-color: #17a2b8; color: white; }    /* Go to Jail */
 
 /* Player tokens */
 .player-token {

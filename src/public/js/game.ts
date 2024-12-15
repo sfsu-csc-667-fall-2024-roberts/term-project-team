@@ -815,7 +815,7 @@ class GameService {
         const fromSpace = BOARD_SPACES[bot.position];
         const toSpace = BOARD_SPACES[data.newPosition];
         await this.showMessageWithDelay(
-          `${bot.username} rolled a ${data.roll}! Moving from ${fromSpace.name} to ${toSpace.name}`,
+          `${bot.username} rolled ${data.dice[0]} and ${data.dice[1]} (total: ${data.roll})! Moving from ${fromSpace.name} to ${toSpace.name}`,
           1000
         );
 
@@ -825,7 +825,7 @@ class GameService {
         await this.board.updatePlayerPosition(bot.id, data.newPosition, botIndex);
       } else {
         await this.showMessageWithDelay(
-          `${bot.username} rolled a ${data.roll}!`,
+          `${bot.username} rolled ${data.dice[0]} and ${data.dice[1]} (total: ${data.roll})!`,
           1000
         );
       }

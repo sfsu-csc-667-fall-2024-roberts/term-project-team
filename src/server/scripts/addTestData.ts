@@ -28,12 +28,24 @@ async function addTestData() {
     throw error;
   } finally {
     client.release();
-    await pool.end();
   }
 }
 
-addTestData()
-  .catch(error => {
-    console.error('Failed to add test data:', error);
-    process.exit(1);
-  }); 
+// Run if called directly
+if (require.main === module) {
+  addTestData()
+    .catch(error => {
+      console.error('Failed to add test data:', error);
+      process.exit(1);
+    })
+    .finally(async () => {
+      try {
+        await pool.end();
+      } catch (error) {
+        console.error('Error closing pool:', error);
+      }
+      process.exit(0);
+    });
+}
+
+export default addTestData; 

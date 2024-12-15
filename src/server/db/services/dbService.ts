@@ -317,42 +317,98 @@ export async function updatePropertyState(propertyId: number, updates: Partial<P
   return result.rows[0];
 }
 
-export async function buyProperty(gameId: number, position: number, playerId: number): Promise<Property> {
+interface PurchaseResult {
+  success: boolean;
+  error?: string;
+  property?: Property;
+  player?: Player;
+}
+
+export async function buyProperty(gameId: number, playerId: number, position: number): Promise<PurchaseResult> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Get property and player
-    const [propertyResult, playerResult] = await Promise.all([
-      client.query('SELECT * FROM properties WHERE game_id = $1 AND position = $2', [gameId, position]),
-      client.query('SELECT * FROM players WHERE game_id = $1 AND id = $2', [gameId, playerId])
-    ]);
-
+    // Get property
+    const propertyResult = await client.query(
+      'SELECT * FROM properties WHERE game_id = $1 AND position = $2',
+      [gameId, position]
+    );
     const property = propertyResult.rows[0];
+
+    if (!property) {
+      throw new Error('Property not found');
+    }
+
+    if (property.owner_id !== null) {
+      throw new Error('Property already owned');
+    }
+
+    // Get player
+    const playerResult = await client.query(
+      'SELECT * FROM players WHERE game_id = $1 AND id = $2',
+      [gameId, playerId]
+    );
     const player = playerResult.rows[0];
 
-    if (!property) throw new Error('Property not found');
-    if (!player) throw new Error('Player not found');
-    if (property.owner_id !== null) throw new Error('Property already owned');
-    if (player.balance < property.price) throw new Error('Insufficient funds');
+    if (!player) {
+      throw new Error('Player not found');
+    }
 
-    // Update property owner and player balance
-    const [updatedProperty] = await Promise.all([
-      client.query(
-        'UPDATE properties SET owner_id = $1 WHERE id = $2 RETURNING *',
-        [playerId, property.id]
-      ),
-      client.query(
-        'UPDATE players SET balance = balance - $1 WHERE id = $2',
-        [property.price, playerId]
-      )
-    ]);
+    if (player.balance < property.price) {
+      throw new Error('Insufficient funds');
+    }
+
+    // Update property owner
+    await client.query(
+      'UPDATE properties SET owner_id = $1 WHERE id = $2',
+      [playerId, property.id]
+    );
+
+    // Update player balance
+    await client.query(
+      'UPDATE players SET balance = balance - $1 WHERE id = $2',
+      [property.price, playerId]
+    );
 
     await client.query('COMMIT');
-    return updatedProperty.rows[0];
+
+    // Convert database property to application property type
+    const updatedProperty = {
+      id: property.id,
+      gameId: property.game_id,
+      position: property.position,
+      name: property.name,
+      type: property.type,
+      price: property.price,
+      rentLevels: property.rent_levels,
+      houseCost: property.house_cost,
+      hotelCost: property.hotel_cost,
+      mortgageValue: property.mortgage_value,
+      colorGroup: property.color_group,
+      ownerId: playerId,
+      houseCount: property.house_count,
+      isMortgaged: property.is_mortgaged,
+      hasHotel: property.has_hotel
+    };
+
+    // Get updated player
+    const updatedPlayerResult = await client.query(
+      'SELECT * FROM players WHERE id = $1',
+      [playerId]
+    );
+
+    return {
+      success: true,
+      property: updatedProperty,
+      player: updatedPlayerResult.rows[0]
+    };
   } catch (error) {
     await client.query('ROLLBACK');
-    throw error;
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   } finally {
     client.release();
   }
@@ -499,6 +555,127 @@ export async function payRent(
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getGameState(gameId: number): Promise<any> {
+  const result = await pool.query('SELECT game_state FROM games WHERE id = $1', [gameId]);
+  return result.rows[0]?.game_state || null;
+}
+
+export async function getProperty(gameId: number, position: number): Promise<Property | null> {
+  const result = await pool.query(
+    'SELECT * FROM properties WHERE game_id = $1 AND position = $2',
+    [gameId, position]
+  );
+  
+  if (!result.rows[0]) return null;
+  
+  // Map database fields to interface fields
+  const dbProperty = result.rows[0];
+  return {
+    id: dbProperty.id,
+    gameId: dbProperty.game_id,
+    position: dbProperty.position,
+    name: dbProperty.name,
+    type: dbProperty.type,
+    price: dbProperty.price,
+    rentLevels: dbProperty.rent_levels,
+    houseCost: dbProperty.house_cost,
+    hotelCost: dbProperty.hotel_cost,
+    mortgageValue: dbProperty.mortgage_value,
+    isMortgaged: dbProperty.is_mortgaged,
+    houseCount: dbProperty.house_count,
+    hasHotel: dbProperty.has_hotel,
+    colorGroup: dbProperty.color_group,
+    ownerId: dbProperty.owner_id,
+    createdAt: dbProperty.created_at,
+    updatedAt: dbProperty.updated_at
+  };
+}
+
+export async function getPlayer(gameId: number, playerId: number): Promise<Player | null> {
+  const result = await pool.query(
+    'SELECT * FROM players WHERE game_id = $1 AND user_id = $2',
+    [gameId, playerId]
+  );
+  return result.rows[0] || null;
+}
+
+export async function purchaseProperty(
+  gameId: number,
+  playerId: number,
+  position: number
+): Promise<{
+  success: boolean;
+  error?: string;
+  property?: Property;
+  player?: Player;
+}> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get property and player in a transaction
+    const property = await getProperty(gameId, position);
+    const player = await getPlayer(gameId, playerId);
+
+    if (!property || !player) {
+      await client.query('ROLLBACK');
+      return {
+        success: false,
+        error: !property ? 'Property not found' : 'Player not found'
+      };
+    }
+
+    if (property.ownerId !== null) {
+      await client.query('ROLLBACK');
+      return {
+        success: false,
+        error: 'Property is already owned'
+      };
+    }
+
+    if (player.balance < property.price) {
+      await client.query('ROLLBACK');
+      return {
+        success: false,
+        error: 'Insufficient funds'
+      };
+    }
+
+    // Update property ownership
+    await client.query(
+      'UPDATE properties SET owner_id = $1 WHERE game_id = $2 AND position = $3',
+      [playerId, gameId, position]
+    );
+
+    // Update player balance
+    await client.query(
+      'UPDATE players SET balance = balance - $1 WHERE game_id = $2 AND user_id = $3',
+      [property.price, gameId, playerId]
+    );
+
+    // Get updated property and player
+    const updatedProperty = await getProperty(gameId, position);
+    const updatedPlayer = await getPlayer(gameId, playerId);
+
+    await client.query('COMMIT');
+
+    return {
+      success: true,
+      property: updatedProperty || undefined,
+      player: updatedPlayer || undefined
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Purchase property error:', error);
+    return {
+      success: false,
+      error: 'Transaction failed'
+    };
   } finally {
     client.release();
   }

@@ -12,54 +12,43 @@ export class BotService {
     return await dbService.getPropertiesByOwnerId(bot.id);
   }
 
-  private static shouldBotBuyProperty(bot: Player, price: number, ownedProperties: Property[]): boolean {
-    // Get bot's strategy and difficulty
-    const strategy = bot.bot_strategy || 'balanced';
-    const difficulty = bot.bot_difficulty || 'medium';
+  private static shouldBotBuyProperty(bot: Player, propertyPrice: number | undefined, ownedProperties: Property[]): boolean {
+    if (!propertyPrice) return false;
+    
+    // Don't buy if it would leave less than $200 in reserve
+    const reserveAmount = 200;
+    if (bot.balance - propertyPrice < reserveAmount) return false;
 
-    // Define thresholds based on strategy and difficulty
-    let buyThreshold = 0.3; // Default threshold
-    let maxOwnershipPercentage = 0.5; // Default max ownership
+    // More likely to buy if bot has more money
+    const wealthFactor = bot.balance / propertyPrice;
+    if (wealthFactor > 3) return true; // Definitely buy if bot has 3x the property price
 
-    // Adjust thresholds based on strategy
-    switch (strategy) {
-      case 'aggressive':
-        buyThreshold = 0.5;
-        maxOwnershipPercentage = 0.8;
-        break;
-      case 'conservative':
-        buyThreshold = 0.2;
-        maxOwnershipPercentage = 0.3;
-        break;
-      case 'balanced':
-        buyThreshold = 0.3;
-        maxOwnershipPercentage = 0.5;
-        break;
+    // More likely to buy if bot owns few properties
+    const propertyCountFactor = ownedProperties.length < 3;
+    
+    // Combined decision based on multiple factors
+    return wealthFactor > 2 || propertyCountFactor;
+  }
+
+  private static shouldPayRent(bot: Player, rentAmount: number): boolean {
+    // Bot must pay rent if possible
+    return bot.balance >= rentAmount;
+  }
+
+  private static calculatePropertyValue(property: Property, ownedProperties: Property[]): number {
+    let value = property.price || 0;
+    
+    // Check if bot owns properties of the same color
+    const sameColorProperties = ownedProperties.filter(p => 
+      BOARD_SPACES[p.position].color === BOARD_SPACES[property.position].color
+    );
+    
+    // Properties become more valuable if bot owns others in the same color group
+    if (sameColorProperties.length > 0) {
+      value *= (1 + (sameColorProperties.length * 0.5));
     }
-
-    // Adjust thresholds based on difficulty
-    switch (difficulty) {
-      case 'easy':
-        buyThreshold *= 0.8;
-        maxOwnershipPercentage *= 0.8;
-        break;
-      case 'hard':
-        buyThreshold *= 1.2;
-        maxOwnershipPercentage *= 1.2;
-        break;
-    }
-
-    // Count total purchasable properties
-    const totalProperties = BOARD_SPACES.filter(
-      space => space.type === 'property' || space.type === 'railroad' || space.type === 'utility'
-    ).length;
-
-    // Calculate current ownership percentage
-    const currentOwnershipPercentage = ownedProperties.length / totalProperties;
-
-    // Check both price threshold and ownership percentage
-    return price <= bot.balance * buyThreshold && 
-           currentOwnershipPercentage < maxOwnershipPercentage;
+    
+    return value;
   }
 
   public static async makeDecision(
@@ -68,12 +57,29 @@ export class BotService {
     currentProperty: Property | null,
     properties: Property[]
   ): Promise<BotDecision> {
+    console.log('Bot making decision:', {
+      botName: bot.username,
+      position: bot.position,
+      balance: bot.balance,
+      currentProperty
+    });
+
     // Get bot's owned properties
     const ownedProperties = await this.getOwnedProperties(bot);
+    console.log('Bot owned properties:', ownedProperties);
 
+    // Handle property purchase decision
     if (currentProperty && !currentProperty.ownerId) {
-      // Decision to buy property
-      if (this.shouldBotBuyProperty(bot, currentProperty.price, ownedProperties)) {
+      const propertyValue = this.calculatePropertyValue(currentProperty, ownedProperties);
+      const shouldBuy = this.shouldBotBuyProperty(bot, propertyValue, ownedProperties);
+      
+      console.log('Bot purchase decision:', {
+        property: currentProperty.name,
+        propertyValue,
+        shouldBuy
+      });
+
+      if (shouldBuy) {
         return {
           action: 'buy',
           property: currentProperty
@@ -81,7 +87,27 @@ export class BotService {
       }
     }
 
+    // Handle rent payment
+    if (currentProperty && currentProperty.ownerId && currentProperty.ownerId !== bot.id) {
+      const rentAmount = currentProperty.rentAmount || 0;
+      const shouldPay = this.shouldPayRent(bot, rentAmount);
+      
+      console.log('Bot rent decision:', {
+        property: currentProperty.name,
+        rentAmount,
+        shouldPay
+      });
+
+      if (shouldPay) {
+        return {
+          action: 'pay_rent',
+          property: currentProperty
+        };
+      }
+    }
+
     // Default to ending turn if no other action is needed
+    console.log('Bot ending turn - no actions available');
     return { action: 'end_turn' };
   }
 

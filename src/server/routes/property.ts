@@ -20,19 +20,4 @@ router.get('/:gameId', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.post('/buy', requireAuth, async (req: Request, res: Response) => {
-  try {
-    const { gameId, position, playerId } = req.body;
-    if (!gameId || !position || !playerId) {
-      res.status(400).json({ error: 'Missing required parameters' });
-      return;
-    }
-    const result = await dbService.buyProperty(gameId, position, playerId);
-    res.json(result);
-  } catch (error) {
-    console.error('Error buying property:', error);
-    res.status(500).json({ error: 'Failed to buy property' });
-  }
-});
-
 export default router;

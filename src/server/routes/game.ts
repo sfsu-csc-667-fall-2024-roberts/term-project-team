@@ -294,7 +294,8 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       properties,
       currentUserId: userId,
       currentPlayerId: currentPlayer.id,
-      gameState
+      gameState,
+      username: typedSession.username
     });
   } catch (error) {
     console.error('Game view error:', error);
@@ -387,10 +388,37 @@ router.post('/:id/roll', requireAuth, async (req: Request, res: Response): Promi
           return rollB - rollA;
         });
         
-        // Set turn order using player IDs from sorted rolls
-        gameState.turn_order = sortedRolls.map(roll => roll.id);
-        gameState.phase = 'playing';
-        console.log('All players have rolled. Turn order:', gameState.turn_order);
+        // Check for ties
+        const tiedRolls = new Map<number, number[]>();
+        sortedRolls.forEach((roll) => {
+          const rollValue = roll.roll || 0;
+          if (!tiedRolls.has(rollValue)) {
+            tiedRolls.set(rollValue, []);
+          }
+          tiedRolls.get(rollValue)?.push(roll.id);
+        });
+
+        // If there are ties, reset rolls for tied players and keep phase as waiting
+        let hasTies = false;
+        tiedRolls.forEach((playerIds, rollValue) => {
+          if (playerIds.length > 1) {
+            hasTies = true;
+            console.log(`Tie detected for roll ${rollValue} between players:`, playerIds);
+            // Reset rolls for tied players
+            gameState.dice_rolls = gameState.dice_rolls.filter(roll => 
+              !playerIds.includes(roll.id)
+            );
+          }
+        });
+
+        if (!hasTies) {
+          // No ties, proceed with turn order
+          gameState.turn_order = sortedRolls.map(roll => roll.id);
+          gameState.phase = 'playing';
+          console.log('All players have rolled. Turn order:', gameState.turn_order);
+        } else {
+          console.log('Ties detected, players need to reroll');
+        }
       }
 
       // Update game state
@@ -828,7 +856,15 @@ router.post('/:id/end-turn', requireAuth, async (req: Request, res: Response): P
   }
 });
 
-// POST /:id/property/buy - Buy a property
+// Define the property purchase response type
+interface PropertyPurchaseResponse {
+  success: boolean;
+  property: Property;
+  player: Player;
+  error?: string;
+}
+
+// Remove duplicate routes and keep only one clean implementation
 router.post('/:id/property/buy', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const client = await pool.connect();
   try {
@@ -838,13 +874,6 @@ router.post('/:id/property/buy', requireAuth, async (req: Request, res: Response
     const { position } = req.body;
     const typedSession = req.session as TypedSession;
     const userId = typedSession.userId;
-
-    console.log('Processing property purchase:', {
-      gameId,
-      position,
-      userId,
-      body: req.body
-    });
 
     if (!userId) {
       res.status(401).json({ error: 'Not authenticated' });
@@ -873,61 +902,57 @@ router.post('/:id/property/buy', requireAuth, async (req: Request, res: Response
       return;
     }
 
-    // Remove nested try-catch and handle errors at transaction level
-    console.log('Attempting to buy property:', {
-      gameId,
-      position,
-      playerId: currentPlayer.id,
-      playerBalance: currentPlayer.balance
-    });
-
-    // Get property first to validate
+    // Get property
     const property = await getPropertyByPosition(gameId, position);
     if (!property) {
-      throw new Error('Property not available for purchase');
+      res.status(404).json({ error: 'Property not found' });
+      return;
     }
 
+    // Validate property is available
     if (property.ownerId !== null) {
-      throw new Error('Property already owned');
+      res.status(400).json({ error: 'Property already owned' });
+      return;
     }
 
+    // Validate player can afford it
     if (currentPlayer.balance < property.price) {
-      throw new Error('Not enough money to buy property');
+      res.status(400).json({ error: 'Insufficient funds' });
+      return;
     }
 
-    // Perform the purchase
-    const result = await buyProperty(gameId, position, currentPlayer.id);
-    console.log('Property purchase successful:', result);
+    // Validate player is on the property
+    if (currentPlayer.position !== position) {
+      res.status(400).json({ error: 'Must be on property to purchase' });
+      return;
+    }
+
+    // Perform purchase
+    const result = await buyProperty(gameId, currentPlayer.id, position);
     
-    // Get updated game data
-    const updatedPlayers = await getGamePlayers(gameId);
-    const updatedProperties = await getGameProperties(gameId);
+    // Get updated state
+    const [updatedPlayers, updatedProperties] = await Promise.all([
+      getGamePlayers(gameId),
+      getGameProperties(gameId)
+    ]);
+
+    const updatedPlayer = updatedPlayers.find(p => p.id === currentPlayer.id);
+    const updatedProperty = updatedProperties.find(p => p.position === position);
+
+    if (!updatedPlayer || !updatedProperty) {
+      throw new Error('Failed to get updated state after purchase');
+    }
 
     await client.query('COMMIT');
     res.json({
       success: true,
-      property: result,
-      players: updatedPlayers,
-      properties: updatedProperties
+      property: updatedProperty,
+      player: updatedPlayer
     });
-
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Buy property error:', error);
-    
-    // Send appropriate error response based on error type
-    if (error instanceof Error) {
-      const statusCode = 
-        error.message.includes('Not enough money') ? 400 :
-        error.message.includes('Property not available') ? 400 :
-        error.message.includes('Property already owned') ? 400 :
-        error.message.includes('Not your turn') ? 403 : 
-        500;
-        
-      res.status(statusCode).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: 'Failed to process property purchase' });
-    }
+    console.error('Property purchase error:', error);
+    res.status(500).json({ error: 'Failed to purchase property' });
   } finally {
     client.release();
   }
@@ -1879,5 +1904,176 @@ async function createProperty(gameId: number, propertyData: Partial<Property>): 
     throw error;
   }
 }
+
+// GET /:id/property/:position - Get property state
+router.get('/:id/property/:position', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    const gameId = parseInt(req.params.id);
+    const position = parseInt(req.params.position);
+
+    console.log('Checking property state:', { gameId, position });
+
+    const property = await getPropertyByPosition(gameId, position);
+    
+    if (!property) {
+      res.status(404).json({ error: 'Property not found' });
+      return;
+    }
+
+    console.log('Property state:', property);
+    res.json(property);
+  } catch (error) {
+    console.error('Property state check error:', error);
+    res.status(500).json({ error: 'Failed to check property state' });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /:gameId/buy-property - Buy a property
+router.post('/:gameId/buy-property', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  console.log('\n=== Buy Property Request ===');
+  const gameId = parseInt(req.params.gameId, 10);
+  const { playerId, position } = req.body;
+  const numericPlayerId = parseInt(playerId, 10);
+  const numericPosition = parseInt(position, 10);
+
+  try {
+    console.log('Request details:', {
+      gameId,
+      playerId: numericPlayerId,
+      position: numericPosition,
+      timestamp: new Date().toISOString()
+    });
+
+    // Validate request parameters
+    if (isNaN(gameId) || isNaN(numericPlayerId) || isNaN(numericPosition)) {
+      console.error('Invalid numeric parameters:', { gameId, playerId, position });
+      res.status(400).json({ error: 'Invalid numeric parameters' });
+      return;
+    }
+
+    // Get current game state
+    const game = await getGame(gameId);
+    if (!game) {
+      console.error('Game not found:', gameId);
+      res.status(404).json({ error: 'Game not found' });
+      return;
+    }
+
+    const gameState = game.game_state;
+    console.log('Current game state:', {
+      phase: gameState.phase,
+      currentPlayerIndex: gameState.current_player_index,
+      turnOrder: gameState.turn_order
+    });
+
+    // Verify it's the player's turn
+    const currentPlayerId = gameState.turn_order[gameState.current_player_index];
+    if (currentPlayerId !== numericPlayerId) {
+      console.error('Not player\'s turn:', {
+        expectedPlayer: currentPlayerId,
+        requestingPlayer: numericPlayerId
+      });
+      res.status(403).json({ error: 'Not your turn' });
+      return;
+    }
+
+    // Get the property details
+    const property = await getPropertyByPosition(gameId, numericPosition);
+    if (!property) {
+      console.error('Property not found:', {
+        gameId,
+        position: numericPosition
+      });
+      res.status(404).json({ error: 'Property not found' });
+      return;
+    }
+
+    console.log('Property details:', {
+      name: property.name,
+      position: property.position,
+      price: property.price,
+      ownerId: property.ownerId
+    });
+
+    // Verify property is not already owned
+    if (property.ownerId !== null) {
+      console.error('Property already owned:', {
+        propertyId: property.id,
+        currentOwnerId: property.ownerId,
+        attemptingPlayerId: numericPlayerId
+      });
+      res.status(400).json({ error: 'Property is already owned' });
+      return;
+    }
+
+    // Get the player
+    const player = await getGamePlayers(gameId).then(players => 
+      players.find(p => p.id === numericPlayerId)
+    );
+    if (!player) {
+      console.error('Player not found:', {
+        gameId,
+        playerId: numericPlayerId
+      });
+      res.status(404).json({ error: 'Player not found' });
+      return;
+    }
+
+    console.log('Player details:', {
+      username: player.username,
+      balance: player.balance,
+      position: player.position
+    });
+
+    // Verify player has enough money
+    if (player.balance < property.price) {
+      console.error('Insufficient funds:', {
+        required: property.price,
+        available: player.balance
+      });
+      res.status(400).json({ error: 'Insufficient funds' });
+      return;
+    }
+
+    // Verify player is on the property
+    if (player.position !== numericPosition) {
+      console.error('Player not on property:', {
+        playerPosition: player.position,
+        propertyPosition: numericPosition
+      });
+      res.status(400).json({ error: 'You must be on the property to purchase it' });
+      return;
+    }
+
+    console.log('Starting purchase transaction');
+
+    // Perform the purchase transaction
+    const result = await buyProperty(gameId, numericPlayerId, numericPosition);
+    
+    if (!result.success) {
+      console.error('Purchase failed:', result.error);
+      res.status(400).json({ error: result.error });
+      return;
+    }
+
+    console.log('Purchase transaction completed successfully');
+    console.log('Updated state:', {
+      property: result.property,
+      player: result.player
+    });
+
+    res.json({
+      success: true,
+      property: result.property,
+      player: result.player
+    });
+  } catch (error) {
+    console.error('Purchase error:', error);
+    res.status(500).json({ error: 'Failed to purchase property' });
+  }
+});
 
 export default router; 

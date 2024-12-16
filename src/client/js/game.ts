@@ -22,7 +22,7 @@ let gameData: GameData;
 let currentGameState: GameState;
 let currentPlayers: Player[];
 let currentProperties: Property[];
-let currentPlayerId: number = -1; // Default to -1 when no player is selected
+let currentPlayerId: number | null = -1; // Default to -1 when no player is selected
 
 // WebSocket connection
 let socket: WebSocket;
@@ -101,6 +101,53 @@ function getNextPlayer(currentPlayerId: number, players: Player[]): Player | nul
   return players[nextIndex];
 }
 
+// Add these functions before updateGameState
+function checkBotTurn() {
+  if (!currentGameState || !currentPlayers) return;
+  
+  const currentPlayer = currentPlayers.find(p => p.id === currentGameState.currentPlayerId);
+  if (currentPlayer?.isBot) {
+    // Implement bot logic here
+    console.log('Bot turn detected:', currentPlayer.username);
+    // For now, just auto-roll and end turn for bots
+    setTimeout(async () => {
+      if (!currentGameState.lastRoll) {
+        await handleRollDice();
+      }
+      if (currentGameState.lastRoll) {
+        await handleEndTurn();
+      }
+    }, 2000);
+  }
+}
+
+function updatePropertiesPanel() {
+  // Update properties panel UI
+  const propertiesSection = document.querySelector('.properties-section');
+  if (!propertiesSection) return;
+
+  // Update available properties
+  const availableProps = currentProperties.filter(p => !p.ownerId);
+  const availableTab = document.getElementById('available');
+  if (availableTab) {
+    // Update available properties UI
+  }
+
+  // Update your properties
+  const yourProps = currentProperties.filter(p => p.ownerId === currentPlayerId);
+  const yourTab = document.getElementById('yours');
+  if (yourTab) {
+    // Update your properties UI
+  }
+
+  // Update other players' properties
+  const otherProps = currentProperties.filter(p => p.ownerId && p.ownerId !== currentPlayerId);
+  const ownedTab = document.getElementById('owned');
+  if (ownedTab) {
+    // Update other players' properties UI
+  }
+}
+
 // Update game state
 function updateGameState(data: GameData) {
   if (!data) {
@@ -108,40 +155,58 @@ function updateGameState(data: GameData) {
     return;
   }
 
-  gameData = {
-    ...data,
-    gameState: {
-      ...data.gameState,
-      players: data.players || [],
-      properties: data.properties || []
-    }
-  };
+  console.log('=== Updating Game Status ===');
+  console.log('Received game data:', data);
+
+  gameData = data;
   
-  currentGameState = gameData.gameState || {
-    phase: 'waiting',
-    players: [],
-    dice_rolls: [],
-    jailTurns: {},
-    turnCount: 0,
-    turnOrder: [],
-    properties: [],
-    doublesCount: 0,
-    jailFreeCards: {},
-    freeParkingPot: 0,
-    bankruptPlayers: [],
-    currentPlayerIndex: 0
+  currentGameState = {
+    id: data.gameId,
+    currentPlayerId: data.currentPlayerId || -1,
+    phase: data.gameState?.phase || 'waiting',
+    currentPlayerIndex: data.gameState?.currentPlayerIndex || 0,
+    diceRolls: data.gameState?.diceRolls || [],
+    turnOrder: data.gameState?.turnOrder || [],
+    players: data.players || [],
+    properties: data.properties || [],
+    doublesCount: data.gameState?.doublesCount || 0,
+    jailTurns: data.gameState?.jailTurns || {},
+    bankruptPlayers: data.gameState?.bankruptPlayers || [],
+    jailFreeCards: data.gameState?.jailFreeCards || {},
+    turnCount: data.gameState?.turnCount || 0,
+    freeParkingPot: data.gameState?.freeParkingPot || 0,
+    lastRoll: data.gameState?.lastRoll,
+    lastDice: data.gameState?.lastDice,
+    lastDoubles: data.gameState?.lastDoubles,
+    lastPosition: data.gameState?.lastPosition,
+    drawnCard: data.gameState?.drawnCard,
+    currentPropertyDecision: data.gameState?.currentPropertyDecision,
+    currentRentOwed: data.gameState?.currentRentOwed,
+    winner: data.gameState?.winner,
+    pendingTrades: data.gameState?.pendingTrades || [],
+    auction: data.gameState?.auction,
+    lastAction: data.gameState?.lastAction,
+    lastActionTimestamp: data.gameState?.lastActionTimestamp,
+    gameLog: data.gameState?.gameLog || []
   };
   
   currentPlayers = data.players || [];
   currentProperties = data.properties || [];
+  currentPlayerId = data.currentPlayerId || -1;
   
-  // Ensure currentPlayerId is a number
-  currentPlayerId = data.currentPlayerId !== null ? data.currentPlayerId : -1;
+  console.log('Updated game state:', currentGameState);
+  console.log('Current player ID:', currentPlayerId);
+
+  // Update the UI
+  updateUI();
 
   // Update the board
   if (window.monopolyBoard) {
     window.monopolyBoard.update();
   }
+
+  // Check for bot turn
+  checkBotTurn();
 }
 
 // Handle roll response
@@ -182,12 +247,21 @@ function getSpaceColor(space: typeof BOARD_SPACES[0]): string {
 }
 
 function initializeWebSocket(gameId: number) {
+  console.log('Initializing WebSocket connection for game:', gameId);
+  
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/games/${gameId}/ws`;
   
+  console.log('WebSocket URL:', wsUrl);
+  
   socket = new WebSocket(wsUrl);
   
+  socket.onopen = () => {
+    console.log('WebSocket connection established');
+  };
+  
   socket.onmessage = (event) => {
+    console.log('WebSocket message received:', event.data);
     try {
       const message = JSON.parse(event.data);
       handleWebSocketMessage(message);
@@ -200,16 +274,22 @@ function initializeWebSocket(gameId: number) {
     console.error('WebSocket error:', error);
   };
 
-  socket.onclose = () => {
-    console.log('WebSocket connection closed');
+  socket.onclose = (event) => {
+    console.log('WebSocket connection closed:', event.code, event.reason);
     // Try to reconnect after 5 seconds
-    setTimeout(() => initializeWebSocket(gameId), 5000);
+    setTimeout(() => {
+      console.log('Attempting to reconnect WebSocket...');
+      initializeWebSocket(gameId);
+    }, 5000);
   };
 }
 
 function handleWebSocketMessage(message: any) {
+  console.log('Handling WebSocket message:', message);
+  
   switch (message.type) {
     case 'state_update':
+      console.log('Received state update:', message);
       updateGameState({
         gameId: gameData.gameId,
         currentUserId: gameData.currentUserId,
@@ -218,14 +298,15 @@ function handleWebSocketMessage(message: any) {
         players: message.players || currentPlayers,
         properties: message.properties || currentProperties
       });
-      updateUI();
       break;
       
     case 'roll_update':
+      console.log('Received roll update:', message);
       handleRollResponse(message.data);
       break;
       
     case 'error':
+      console.error('Received error message:', message);
       showError(message.message);
       break;
       
@@ -234,104 +315,69 @@ function handleWebSocketMessage(message: any) {
   }
 }
 
+// Update UI elements
 function updateUI() {
-  // Update players panel
+  console.log('=== Updating Players Status ===');
+  
+  // Update player cards
   const playersList = document.querySelector('.players-list');
-  if (playersList && currentPlayers) {
-    playersList.innerHTML = currentPlayers.map(player => `
-      <div class="player-card ${player.id === currentPlayerId ? 'current-player' : ''}"
-           data-player-id="${player.id}">
-        <div class="player-avatar">
-          ${player.isBot ? '🤖' : '👤'}
-        </div>
-        <div class="player-info">
-          <div class="player-name">
-            ${player.username}
-            ${player.id === currentPlayerId ? '<span class="player-you">(You)</span>' : ''}
-          </div>
-          <div class="player-stats">
-            <div class="player-balance">$${player.money}</div>
-            <div class="player-position">${player.position}</div>
-            <div class="roll-status">
-              ${getRollStatus(player)}
-            </div>
-          </div>
-        </div>
-      </div>
-    `).join('');
+  if (playersList) {
+    currentPlayers.forEach(player => {
+      console.log('Updating player:', player);
+      const playerCard = playersList.querySelector(`[data-player-id="${player.id}"]`);
+      if (playerCard) {
+        // Update money
+        const moneyElement = playerCard.querySelector('.player-balance');
+        if (moneyElement) {
+          moneyElement.textContent = `$${player.money}`;
+        }
+
+        // Update position if in playing phase
+        const positionElement = playerCard.querySelector('.player-position');
+        if (positionElement && currentGameState.phase === 'playing') {
+          positionElement.textContent = `Position: ${player.position}`;
+        }
+
+        // Update controls visibility
+        const controls = playerCard.querySelector('.player-controls');
+        if (controls) {
+          const rollButton = controls.querySelector('#roll-dice') as HTMLButtonElement;
+          const endTurnButton = controls.querySelector('#end-turn') as HTMLButtonElement;
+
+          if (rollButton) {
+            const canRoll = (currentGameState.phase === 'waiting' && !currentGameState.diceRolls.find(r => r.id === player.id)) ||
+                          (currentGameState.phase === 'playing' && currentGameState.currentPlayerId === player.id && !currentGameState.lastRoll);
+            rollButton.disabled = !canRoll;
+            rollButton.classList.toggle('active', Boolean(canRoll));
+          }
+
+          if (endTurnButton) {
+            const canEndTurn = currentGameState.phase === 'playing' && 
+                             currentGameState.currentPlayerId === player.id && 
+                             currentGameState.lastRoll;
+            endTurnButton.disabled = !canEndTurn;
+            endTurnButton.classList.toggle('active', Boolean(canEndTurn));
+          }
+        }
+      }
+    });
+  }
+
+  // Update game status
+  const gameStatus = document.querySelector('.game-status');
+  if (gameStatus) {
+    if (currentGameState.phase === 'waiting') {
+      gameStatus.textContent = `Initial Roll Phase - Roll to determine turn order (${currentGameState.diceRolls.length}/${currentPlayers.length} players rolled)`;
+    } else if (currentGameState.phase === 'playing') {
+      const currentPlayer = currentPlayers.find(p => p.id === currentGameState.currentPlayerId);
+      if (currentPlayer) {
+        gameStatus.textContent = `${currentPlayer.username}'s Turn${currentPlayer.id === currentPlayerId ? ' - Your turn!' : ''}`;
+      }
+    }
   }
 
   // Update properties panel
-  const propertiesList = document.querySelector('.properties-list');
-  if (propertiesList && currentProperties) {
-    const groupedProperties = currentProperties.reduce((acc, prop) => {
-      if (prop.colorGroup) {
-        if (!acc[prop.colorGroup]) {
-          acc[prop.colorGroup] = [];
-        }
-        acc[prop.colorGroup].push(prop);
-      }
-      return acc;
-    }, {} as Record<string, Property[]>);
-
-    propertiesList.innerHTML = Object.entries(groupedProperties)
-      .map(([colorGroup, props]) => `
-        <div class="property-group" data-color-group="${colorGroup}">
-          <h3 class="group-title">${colorGroup.charAt(0).toUpperCase() + colorGroup.slice(1)}</h3>
-          <div class="group-properties">
-            ${props.map(property => `
-              <div class="property-card" data-property-id="${property.id}">
-                <div class="color-strip" style="background-color: ${property.colorGroup}"></div>
-                <div class="property-name">${property.name}</div>
-                <div class="property-price">$${property.price}</div>
-                ${property.ownerId ? `
-                  <div class="property-owner">
-                    Owner: ${getPlayerName(property.ownerId)}
-                  </div>
-                ` : ''}
-                <div class="property-stats">
-                  ${property.houseCount > 0 ? `
-                    <div class="house-count">Houses: ${property.houseCount}</div>
-                  ` : ''}
-                  ${property.hasHotel ? `
-                    <div class="hotel-indicator">Hotel</div>
-                  ` : ''}
-                  ${property.isMortgaged ? `
-                    <div class="mortgaged-indicator">Mortgaged</div>
-                  ` : ''}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `).join('');
-  }
-
-  // Update game controls
-  const rollDiceButton = document.getElementById('roll-dice') as HTMLButtonElement;
-  const endTurnButton = document.getElementById('end-turn') as HTMLButtonElement;
-
-  if (rollDiceButton && endTurnButton) {
-    const isCurrentPlayer = currentGameState.turnOrder[currentGameState.currentPlayerIndex] === currentPlayerId;
-    const canRoll = isCurrentPlayer && (
-      currentGameState.phase === 'waiting' ||
-      (currentGameState.phase === 'playing' && !currentGameState.lastRoll)
-    );
-    const canEndTurn = isCurrentPlayer && currentGameState.phase === 'playing' && currentGameState.lastRoll;
-
-    rollDiceButton.disabled = !canRoll;
-    endTurnButton.disabled = !canEndTurn;
-  }
-
-  // Update board
-  if (window.monopolyBoard) {
-    window.monopolyBoard.update();
-    
-    // Update current player highlight
-    if (currentGameState.turnOrder[currentGameState.currentPlayerIndex]) {
-      window.monopolyBoard.setCurrentPlayer(currentGameState.turnOrder[currentGameState.currentPlayerIndex]);
-    }
-  }
+  updatePropertiesPanel();
 }
 
 function getRollStatus(player: Player): string {
@@ -354,37 +400,14 @@ function getPlayerName(playerId: number): string {
 
 // Initialize game when document is ready
 document.addEventListener('DOMContentLoaded', () => {
-  // Initialize tab system
-  const tabButtons = document.querySelectorAll('.tab-button');
-  const tabPanes = document.querySelectorAll('.tab-pane');
-
-  tabButtons.forEach(button => {
-    button.addEventListener('click', () => {
-      const targetTab = button.getAttribute('data-tab');
-      
-      // Update active states
-      tabButtons.forEach(btn => btn.classList.remove('active'));
-      tabPanes.forEach(pane => pane.classList.remove('active'));
-      
-      button.classList.add('active');
-      document.getElementById(targetTab!)?.classList.add('active');
-    });
-  });
-
-  // Initialize game controls
-  const gameControls = document.createElement('div');
-  gameControls.className = 'game-controls';
-  gameControls.innerHTML = `
-    <button id="roll-dice" class="btn btn-primary" disabled>Roll Dice</button>
-    <button id="end-turn" class="btn btn-secondary" disabled>End Turn</button>
-  `;
-  document.body.appendChild(gameControls);
-
+  console.log('=== Game Initialization ===');
+  
   // Initialize WebSocket connection
   const gameIdElement = document.querySelector('[data-game-id]');
   if (gameIdElement) {
     const gameId = parseInt(gameIdElement.getAttribute('data-game-id') || '0', 10);
     if (gameId) {
+      console.log('Initializing WebSocket for game:', gameId);
       initializeWebSocket(gameId);
     }
   }
@@ -392,62 +415,137 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize the game board
   window.monopolyBoard = new MonopolyBoard('monopoly-board');
 
-  // Add event listeners for game controls
-  const rollDiceButton = document.getElementById('roll-dice');
-  const endTurnButton = document.getElementById('end-turn');
+  // Get initial game data from the window object
+  if (window.monopolyGameData) {
+    console.log('Initial game data found:', window.monopolyGameData);
+    
+    // Initialize game state from window data
+    gameData = window.monopolyGameData;
+    currentPlayerId = window.monopolyGameData.currentPlayerId ?? -1;
+    currentPlayers = window.monopolyGameData.players || [];
+    currentProperties = window.monopolyGameData.properties || [];
+    
+    // Initialize game state
+    currentGameState = {
+      id: window.monopolyGameData.gameId,
+      phase: window.monopolyGameData.gameState?.phase || 'waiting',
+      currentPlayerId: window.monopolyGameData.currentPlayerId || -1,
+      currentPlayerIndex: window.monopolyGameData.gameState?.currentPlayerIndex || 0,
+      players: window.monopolyGameData.players || [],
+      properties: window.monopolyGameData.properties || [],
+      diceRolls: window.monopolyGameData.gameState?.diceRolls || [],
+      turnOrder: window.monopolyGameData.gameState?.turnOrder || [],
+      doublesCount: window.monopolyGameData.gameState?.doublesCount || 0,
+      jailTurns: window.monopolyGameData.gameState?.jailTurns || {},
+      bankruptPlayers: window.monopolyGameData.gameState?.bankruptPlayers || [],
+      jailFreeCards: window.monopolyGameData.gameState?.jailFreeCards || {},
+      turnCount: window.monopolyGameData.gameState?.turnCount || 0,
+      freeParkingPot: window.monopolyGameData.gameState?.freeParkingPot || 0,
+      lastRoll: window.monopolyGameData.gameState?.lastRoll,
+      lastDice: window.monopolyGameData.gameState?.lastDice,
+      lastDoubles: window.monopolyGameData.gameState?.lastDoubles,
+      lastPosition: window.monopolyGameData.gameState?.lastPosition,
+      drawnCard: window.monopolyGameData.gameState?.drawnCard,
+      currentPropertyDecision: window.monopolyGameData.gameState?.currentPropertyDecision,
+      currentRentOwed: window.monopolyGameData.gameState?.currentRentOwed,
+      winner: window.monopolyGameData.gameState?.winner,
+      pendingTrades: window.monopolyGameData.gameState?.pendingTrades || [],
+      auction: window.monopolyGameData.gameState?.auction,
+      lastAction: window.monopolyGameData.gameState?.lastAction,
+      lastActionTimestamp: window.monopolyGameData.gameState?.lastActionTimestamp,
+      gameLog: window.monopolyGameData.gameState?.gameLog || []
+    };
 
-  rollDiceButton?.addEventListener('click', async () => {
-    if (!currentPlayerId || !gameData) return;
+    console.log('Game state initialized:', currentGameState);
+    console.log('Current player ID:', currentPlayerId);
 
-    try {
-      const response = await fetch(`/games/${gameData.gameId}/roll`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ playerId: currentPlayerId })
-      });
+    // Initialize event listeners for player controls
+    initializeEventListeners();
 
-      const data = await response.json();
-      if (data.success) {
-        handleRollResponse(data);
-      } else {
-        showError(data.message || 'Roll failed');
-      }
-    } catch (error) {
-      console.error('Error rolling dice:', error);
-      showError('Failed to roll dice');
-    }
-  });
-
-  endTurnButton?.addEventListener('click', async () => {
-    if (!currentPlayerId || !gameData) return;
-
-    try {
-      const response = await fetch(`/games/${gameData.gameId}/end-turn`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ playerId: currentPlayerId })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        updateGameState(data.gameData);
-      } else {
-        showError(data.message || 'Failed to end turn');
-      }
-    } catch (error) {
-      console.error('Error ending turn:', error);
-      showError('Failed to end turn');
-    }
-  });
-
-  // Update UI with initial game state
-  if (window.gameData) {
-    updateGameState(window.gameData);
+    // Update UI with initial state
+    updateUI();
+  } else {
+    console.error('No initial game data found in window.monopolyGameData');
   }
 });
+
+// Initialize event listeners
+function initializeEventListeners() {
+  console.log('=== Initializing Event Listeners ===');
+  
+  // Add event listeners to roll dice buttons
+  document.querySelectorAll('#roll-dice').forEach(button => {
+    button.addEventListener('click', handleRollDice);
+    console.log('Added roll dice event listener');
+  });
+
+  // Add event listeners to end turn buttons
+  document.querySelectorAll('#end-turn').forEach(button => {
+    button.addEventListener('click', handleEndTurn);
+    console.log('Added end turn event listener');
+  });
+
+  console.log('Event listeners initialized');
+}
+
+async function handleRollDice() {
+  if (!currentPlayerId || !gameData) return;
+
+  try {
+    const rollDiceButton = document.getElementById('roll-dice') as HTMLButtonElement;
+    if (rollDiceButton) rollDiceButton.disabled = true;
+
+    const response = await fetch(`/games/${gameData.gameId}/roll`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ playerId: currentPlayerId })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      handleRollResponse(data);
+    } else {
+      showError(data.message || 'Roll failed');
+      if (rollDiceButton) rollDiceButton.disabled = false;
+    }
+  } catch (error) {
+    console.error('Error rolling dice:', error);
+    showError('Failed to roll dice');
+    const rollDiceButton = document.getElementById('roll-dice') as HTMLButtonElement;
+    if (rollDiceButton) rollDiceButton.disabled = false;
+  }
+}
+
+async function handleEndTurn() {
+  if (!currentPlayerId || !gameData) return;
+
+  try {
+    const endTurnButton = document.getElementById('end-turn') as HTMLButtonElement;
+    if (endTurnButton) endTurnButton.disabled = true;
+
+    const response = await fetch(`/games/${gameData.gameId}/end-turn`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ playerId: currentPlayerId })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      updateGameState(data.gameData);
+    } else {
+      showError(data.message || 'Failed to end turn');
+      if (endTurnButton) endTurnButton.disabled = false;
+    }
+  } catch (error) {
+    console.error('Error ending turn:', error);
+    showError('Failed to end turn');
+    const endTurnButton = document.getElementById('end-turn') as HTMLButtonElement;
+    if (endTurnButton) endTurnButton.disabled = false;
+  }
+}
 
 // ... rest of the file ...

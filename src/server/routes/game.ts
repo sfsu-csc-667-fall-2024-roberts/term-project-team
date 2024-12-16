@@ -89,32 +89,78 @@ router.get('/:gameId', requireAuth, async (req: Request<{ gameId: string }>, res
     console.log('Properties:', JSON.stringify(properties, null, 2));
 
     const typedSession = req.session as any;
-    const currentPlayerId = players.find(p => p.userId === typedSession.userId)?.id;
+    const currentPlayer = players.find(p => p.userId === typedSession.userId);
+    const currentPlayerId = currentPlayer?.id || -1;
     console.log('Current player ID:', currentPlayerId);
 
-    console.log('Rendering game view...');
-    const defaultGameState = {
+    // Initialize default game state with proper structure
+    const defaultGameState: GameState = {
+      id: gameId,
       phase: 'waiting',
-      players: [],
-      dice_rolls: [],
-      jailTurns: {},
-      turnCount: 0,
+      currentPlayerId: currentPlayerId,
+      currentPlayerIndex: 0,
+      players: players,
+      properties: properties,
+      diceRolls: [],
       turnOrder: [],
-      properties: [],
       doublesCount: 0,
-      jailFreeCards: {},
-      freeParkingPot: 0,
+      jailTurns: {},
       bankruptPlayers: [],
-      currentPlayerIndex: 0
+      jailFreeCards: {},
+      turnCount: 0,
+      freeParkingPot: 0,
+      lastRoll: undefined,
+      lastDice: undefined,
+      lastDoubles: undefined,
+      lastPosition: undefined,
+      drawnCard: undefined,
+      currentPropertyDecision: undefined,
+      currentRentOwed: undefined,
+      winner: undefined,
+      pendingTrades: [],
+      auction: undefined,
+      lastAction: undefined,
+      lastActionTimestamp: undefined,
+      gameLog: []
     };
 
+    // Ensure game state has all required properties
+    const gameState: GameState = {
+      ...defaultGameState,
+      ...(game.game_state || {}),
+      currentPlayerId: game.game_state?.currentPlayerId || currentPlayerId,
+      diceRolls: game.game_state?.diceRolls || [],
+      players: players,
+      properties: properties
+    };
+
+    // Update game state in database if needed
+    if (JSON.stringify(gameState) !== JSON.stringify(game.game_state)) {
+      await gameService.updateGameState(gameId, gameState);
+      game.game_state = gameState;
+    }
+
+    // Validate game state before rendering
+    console.log('Validating game state before render:', {
+      phase: gameState.phase,
+      diceRolls: gameState.diceRolls,
+      players: players.length,
+      currentPlayerId: currentPlayerId
+    });
+
+    // Ensure diceRolls is an array
+    if (!Array.isArray(gameState.diceRolls)) {
+      gameState.diceRolls = [];
+    }
+
+    console.log('Rendering game view...');
     res.render('game', {
       game,
       players,
       properties,
       currentUserId: typedSession.userId,
       currentPlayerId,
-      gameState: game.game_state || defaultGameState,
+      gameState,
       username: typedSession.username
     });
     console.log('Game view rendered successfully');

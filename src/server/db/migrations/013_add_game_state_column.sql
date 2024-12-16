@@ -1,2 +1,29 @@
 -- Add game_state column to games table
-ALTER TABLE games ADD COLUMN IF NOT EXISTS game_state JSONB DEFAULT '{"phase": "waiting", "currentPlayerIndex": 0, "diceRolls": [], "turnOrder": [], "players": [], "properties": [], "doublesCount": 0, "jailTurns": {}, "bankruptPlayers": [], "jailFreeCards": {}, "turnCount": 0, "freeParkingPot": 0}'::jsonb; 
+ALTER TABLE games ADD COLUMN IF NOT EXISTS game_state JSONB DEFAULT '{
+  "phase": "waiting",
+  "currentPlayerId": -1,
+  "currentPlayerIndex": 0,
+  "players": [],
+  "properties": [],
+  "diceRolls": [],
+  "turnOrder": [],
+  "doublesCount": 0,
+  "jailTurns": {},
+  "bankruptPlayers": [],
+  "jailFreeCards": {},
+  "turnCount": 0,
+  "freeParkingPot": 0,
+  "lastRoll": null,
+  "lastDice": null,
+  "lastDoubles": false,
+  "lastPosition": null,
+  "drawnCard": null,
+  "currentPropertyDecision": null,
+  "currentRentOwed": null,
+  "winner": null,
+  "pendingTrades": [],
+  "auction": null,
+  "lastAction": null,
+  "lastActionTimestamp": null,
+  "gameLog": []
+}'::jsonb; 

@@ -249,195 +249,149 @@
 
 /* Player cards */
 .player-card {
-  background: white;
-  border: 1px solid #e9ecef;
+  padding: 16px;
+  margin-bottom: 12px;
   border-radius: 8px;
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.75rem;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.player-card.current-player {
-  background: #f8f9fa;
-  border-color: #3498db;
-  transform: translateX(4px);
-  box-shadow: 0 2px 4px rgba(52, 152, 219, 0.15);
-}
-
-.player-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #f8f9fa;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.25rem;
-  border: 2px solid #e9ecef;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.current-player .player-avatar {
-  border-color: #3498db;
-  background: #ebf5fb;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .player-info {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  min-width: 0;
+  gap: 8px;
 }
 
 .player-name {
-  font-weight: 600;
+  font-weight: bold;
+  font-size: 1.1em;
   color: #2c3e50;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 8px;
 }
 
 .player-you {
-  font-size: 0.75rem;
+  font-size: 0.8em;
   color: #3498db;
-  font-weight: 500;
   background: #ebf5fb;
-  padding: 0.15rem 0.5rem;
+  padding: 2px 8px;
   border-radius: 12px;
-  white-space: nowrap;
 }
 
 .player-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  color: #666;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.9em;
+  margin-bottom: 8px;
 }
 
 .player-balance {
-  font-weight: 600;
-  color: #27ae60;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  white-space: nowrap;
+  font-weight: bold;
+  color: #2e7d32;
 }
 
 .player-position {
   color: #666;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .roll-status {
-  font-size: 0.85rem;
+  font-size: 0.85em;
   color: #666;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.35rem;
-  padding-top: 0.35rem;
+  padding: 8px 0;
   border-top: 1px solid #e9ecef;
+  margin-top: auto;
 }
 
 .player-controls {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: 8px;
+  padding-top: 8px;
+  margin-top: auto;
 }
 
 .player-controls button {
-  padding: 0.5rem 1rem;
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 0.9em;
+  height: 32px;
+  border-radius: 4px;
   border: none;
-  border-radius: 6px;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  flex: 1;
-  min-width: 0;
-  position: relative;
-  overflow: hidden;
-  font-size: 0.9rem;
-  background: #f8f9fa;
-  color: #666;
+  white-space: nowrap;
+  min-width: 90px;
+  max-width: calc(50% - 4px);
 }
 
 .player-controls button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-.player-controls button:not(:disabled) {
-  cursor: pointer;
 }
 
 .player-controls button:not(:disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  opacity: 0.9;
 }
 
-.player-controls button:not(:disabled):active {
-  transform: translateY(0);
-}
-
-#roll-dice {
-  background: #3498db;
+.player-controls #roll-dice {
+  background-color: #4CAF50;
   color: white;
 }
 
-#roll-dice:not(:disabled):hover {
-  background: #2980b9;
+.player-controls #end-turn {
+  background-color: #f44336;
+  color: white;
 }
 
-#roll-dice.active {
-  animation: pulse 2s infinite;
+.player-card {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
-#end-turn {
-  background: #e9ecef;
+.player-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.player-name {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 4px;
+}
+
+.player-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.player-balance {
+  font-weight: bold;
+  color: #2e7d32;
+}
+
+.player-position {
   color: #666;
 }
 
-#end-turn:not(:disabled):hover {
-  background: #dee2e6;
-}
-
-#end-turn.active {
-  background: #27ae60;
-  color: white;
-}
-
-#end-turn.active:hover {
-  background: #219a52;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 6px rgba(52, 152, 219, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
-  }
+.roll-status {
+  width: 100%;
+  font-size: 0.85em;
+  color: #666;
 }
 
 .jail-free-card {
@@ -920,4 +874,73 @@
   transform: scale(1.1) !important;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
   z-index: 11;
+}
+
+/* Message history panel */
+.message-history-panel {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  width: 300px;
+  max-height: 400px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.message-history-panel.hidden {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
+
+.message-history-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.message-history-header h3 {
+  margin: 0;
+  font-size: 1.1em;
+  color: #2c3e50;
+}
+
+.close-history-button {
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  color: #666;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.message-history-content {
+  padding: 12px;
+  overflow-y: auto;
+  max-height: 350px;
+}
+
+.message-history-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9em;
+}
+
+.message-time {
+  color: #666;
+  font-size: 0.85em;
+  margin-right: 8px;
+}
+
+.message-text {
+  color: #2c3e50;
 }

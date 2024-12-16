@@ -19,16 +19,16 @@
       <div class="header-center">
         <div class="game-status-wrapper">
           <div class="game-status" title="Click to view game history">
-            <% if (gameState.phase === 'waiting') { %>
-              Initial Roll Phase - Roll to determine turn order (<%= gameState.dice_rolls.length %>/<%= players.length %> players rolled)
-            <% } else if (gameState.phase === 'playing') { %>
-              <% const currentPlayer = players.find(p => p.id === gameState.turnOrder[gameState.currentPlayerIndex]); %>
+            <% if (gameState && gameState.phase === 'waiting') { %>
+              Initial Roll Phase - Roll to determine turn order (<%= (gameState.diceRolls || []).length %>/<%= players.length %> players rolled)
+            <% } else if (gameState && gameState.phase === 'playing') { %>
+              <% const currentPlayer = players.find(p => p.id === (gameState.turnOrder || [])[gameState.currentPlayerIndex]); %>
               <%= currentPlayer ? `${currentPlayer.username}'s Turn` : 'Loading...' %>
               <% if (currentPlayer && currentPlayer.id === currentPlayerId) { %>
                 - Your turn!
               <% } %>
             <% } else { %>
-              <%= game.status %>
+              <%= game.status || 'Loading...' %>
             <% } %>
           </div>
         </div>
@@ -71,18 +71,18 @@
                     <% } %>
                   </div>
                   <div class="player-stats">
-                    <div class="player-balance">$<%= player.balance %></div>
+                    <div class="player-balance">$<%= player.money %></div>
                     <div class="player-position">
                       <% if (gameState.phase === 'playing') { %>
-                        <%= player.position %>
+                        Position: <%= player.position %>
                       <% } %>
                     </div>
                     <div class="roll-status">
                       <% if (gameState.phase === 'waiting') { %>
-                        <% const playerRoll = gameState.dice_rolls.find(r => r.id === player.id); %>
+                        <% const playerRoll = gameState.diceRolls.find(r => r.id === player.id); %>
                         <%= playerRoll ? `Rolled: ${playerRoll.roll}` : 'Waiting for roll...' %>
                       <% } else { %>
-                        <% if (gameState.turnOrder[gameState.currentPlayerIndex] === player.id) { %>
+                        <% if (gameState.turnOrder && gameState.turnOrder[gameState.currentPlayerIndex] === player.id) { %>
                           Current turn
                         <% } else { %>
                           Waiting...
@@ -92,15 +92,12 @@
                   </div>
                   <% if (player.id === currentPlayerId) { %>
                     <div class="player-controls">
-                      <button id="roll-dice" class="btn btn-primary"
-                        <%= (gameState.phase === 'waiting' && !gameState.dice_rolls.find(r => r.id === currentPlayerId)) ||
-                            (gameState.phase === 'playing' && gameState.turnOrder[gameState.currentPlayerIndex] === currentPlayerId)
-                            ? '' : 'disabled' %>>
-                        Roll
+                      <button id="roll-dice" class="btn btn-primary <%= (gameState.phase === 'waiting' && !gameState.diceRolls.find(r => r.id === currentPlayerId)) || (gameState.phase === 'playing' && gameState.currentPlayerId === currentPlayerId && !gameState.lastRoll) ? 'active' : '' %>"
+                        <%= (gameState.phase === 'waiting' && !gameState.diceRolls.find(r => r.id === currentPlayerId)) || (gameState.phase === 'playing' && gameState.currentPlayerId === currentPlayerId && !gameState.lastRoll) ? '' : 'disabled' %>>
+                        Roll Dice
                       </button>
-                      <button id="end-turn" class="btn btn-secondary" 
-                        <%= gameState.phase === 'playing' && gameState.turnOrder[gameState.currentPlayerIndex] === currentPlayerId
-                            ? '' : 'disabled' %>>
+                      <button id="end-turn" class="btn btn-secondary <%= gameState.phase === 'playing' && gameState.currentPlayerId === currentPlayerId && gameState.lastRoll ? 'active' : '' %>"
+                        <%= gameState.phase === 'playing' && gameState.currentPlayerId === currentPlayerId && gameState.lastRoll ? '' : 'disabled' %>>
                         End Turn
                       </button>
                     </div>
@@ -308,14 +305,13 @@
   </div>
 
   <script>
-    window.gameData = <%- JSON.stringify({
-      gameId: game.id,
-      players,
-      currentUserId,
-      currentPlayerId,
-      properties,
-      gameState
-    }, null, 2) %>;
+    window.monopolyGameData = {
+      gameId: <%= game.id %>,
+      currentPlayerId: <%= currentPlayerId || -1 %>,
+      gameState: <%- JSON.stringify(gameState || {}) %>,
+      players: <%- JSON.stringify(players || []) %>,
+      properties: <%- JSON.stringify(properties || []) %>
+    };
   </script>
 
   <script src="/dist/game.bundle.js"></script>

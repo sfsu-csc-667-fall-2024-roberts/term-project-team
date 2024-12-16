@@ -7,7 +7,7 @@ export type Property = SharedProperty;
 export interface GameData {
   gameId: number;
   currentUserId: number | null;
-  currentPlayerId: number | null;
+  currentPlayerId: number;
   players: Player[];
   properties: Property[];
   gameState: GameState;
@@ -23,9 +23,26 @@ export interface ApiError {
   error: string;
 }
 
+export interface RollResponse {
+  success: boolean;
+  message?: string;
+  roll?: number;
+  dice?: [number, number];
+  isDoubles?: boolean;
+  gameState?: GameState;
+  players?: Player[];
+  spaceAction?: SpaceAction;
+}
+
+export interface SpaceAction {
+  type: string;
+  message: string;
+  data?: any;
+}
+
 declare global {
   interface Window {
-    gameData: GameData;
+    monopolyGameData: GameData;
   }
 }
  

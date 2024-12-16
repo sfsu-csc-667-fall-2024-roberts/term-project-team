@@ -61,8 +61,10 @@ async function createGame(ownerId: number): Promise<number> {
   try {
     await client.query('BEGIN');
     
-    const initialGameState = {
+    const initialGameState: GameState = {
+      id: 0, // Will be updated after game creation
       phase: 'waiting',
+      currentPlayerId: 0, // Will be updated after first player joins
       currentPlayerIndex: 0,
       diceRolls: [],
       turnOrder: [],
@@ -85,6 +87,13 @@ async function createGame(ownerId: number): Promise<number> {
     
     const gameId = result.rows[0].id;
     console.log('Game created:', result.rows[0]);
+
+    // Update the game state with the correct ID
+    initialGameState.id = gameId;
+    await client.query(
+      'UPDATE games SET game_state = $1 WHERE id = $2',
+      [initialGameState, gameId]
+    );
     
     // Initialize properties for the game
     await initializeGameProperties(client, gameId);
@@ -138,10 +147,27 @@ async function joinGame(gameId: number, userId: number, username: string): Promi
     }
     
     // Add player to game
-    await client.query(
-      'INSERT INTO players (game_id, user_id, username, position, money, is_bot) VALUES ($1, $2, $3, $4, $5, $6)',
+    const playerResult = await client.query(
+      'INSERT INTO players (game_id, user_id, username, position, money, is_bot) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
       [gameId, userId, username, 0, 1500, false]
     );
+
+    const playerId = playerResult.rows[0].id;
+
+    // Update game state with the first player's ID if this is the first player
+    const gameState = await client.query(
+      'SELECT game_state FROM games WHERE id = $1',
+      [gameId]
+    );
+
+    const currentState = gameState.rows[0].game_state;
+    if (!currentState.currentPlayerId || currentState.currentPlayerId === 0) {
+      currentState.currentPlayerId = playerId;
+      await client.query(
+        'UPDATE games SET game_state = $1 WHERE id = $2',
+        [currentState, gameId]
+      );
+    }
     
     await client.query('COMMIT');
     return true;
@@ -160,10 +186,27 @@ async function createBotPlayer(gameId: number, botName: string, strategy: string
   try {
     await client.query('BEGIN');
     
-    await client.query(
-      'INSERT INTO players (game_id, username, position, money, is_bot, bot_strategy, bot_difficulty) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+    const result = await client.query(
+      'INSERT INTO players (game_id, username, position, money, is_bot, bot_strategy, bot_difficulty) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
       [gameId, botName, 0, 1500, true, strategy, difficulty]
     );
+
+    const botId = result.rows[0].id;
+
+    // Update game state with the bot's ID if this is the first player
+    const gameState = await client.query(
+      'SELECT game_state FROM games WHERE id = $1',
+      [gameId]
+    );
+
+    const currentState = gameState.rows[0].game_state;
+    if (!currentState.currentPlayerId || currentState.currentPlayerId === 0) {
+      currentState.currentPlayerId = botId;
+      await client.query(
+        'UPDATE games SET game_state = $1 WHERE id = $2',
+        [currentState, gameId]
+      );
+    }
     
     await client.query('COMMIT');
     return true;
@@ -268,11 +311,25 @@ router.post('/create', requireAuth, async (req: Request, res: Response) => {
     const typedSession = req.session as any;
     console.log('User session:', typedSession);
     
+    // Get bot settings from request
+    const botCount = parseInt(req.body.botCount) || 0;
+    const botDifficulty = req.body.botDifficulty || 'medium';
+    const botStrategy = req.body.botStrategy || 'balanced';
+    
+    console.log('Bot settings:', { botCount, botDifficulty, botStrategy });
+    
     const gameId = await createGame(typedSession.userId);
     console.log('Game created with ID:', gameId);
     
     const joinResult = await joinGame(gameId, typedSession.userId, typedSession.username);
     console.log('Join game result:', joinResult);
+    
+    // Add bots if requested
+    for (let i = 0; i < botCount; i++) {
+      const botName = `Bot ${i + 1}`;
+      const success = await createBotPlayer(gameId, botName, botStrategy, botDifficulty);
+      console.log(`Bot ${i + 1} creation result:`, success);
+    }
     
     res.redirect(`/games/${gameId}`);
   } catch (error) {

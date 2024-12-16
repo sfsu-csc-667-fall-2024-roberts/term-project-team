@@ -9,81 +9,167 @@ export class RentCalculationService {
     this.players = players;
   }
 
-  calculateRent(property: Property): number {
-    if (property.isMortgaged) return 0;
-
-    let rent = property.rentLevels[0]; // Base rent with no houses
-
-    if (property.hasHotel || property.houseCount === 5) {
-      rent = property.rentLevels[5];
-    } else if (property.houseCount > 0) {
-      rent = property.rentLevels[property.houseCount];
+  public calculateRent(property: Property): number {
+    if (property.isMortgaged) {
+      return 0;
     }
 
-    // Handle railroads
-    if (property.type === 'railroad') {
-      const owner = this.players.find(p => p.id === property.ownerId);
-      if (owner) {
-        const railroadCount = this.properties.filter(p => 
-          p.type === 'railroad' && p.ownerId === owner.id
-        ).length;
-        rent = property.rentLevels[railroadCount - 1];
-      }
+    switch (property.type) {
+      case 'property':
+        return this.calculatePropertyRent(property);
+      case 'railroad':
+        return this.calculateRailroadRent(property);
+      case 'utility':
+        return this.calculateUtilityRent(property);
+      default:
+        return 0;
+    }
+  }
+
+  private calculatePropertyRent(property: Property): number {
+    if (!property.ownerId || property.isMortgaged) {
+      return 0;
     }
 
-    // Handle utilities
-    if (property.type === 'utility') {
-      const owner = this.players.find(p => p.id === property.ownerId);
-      if (owner) {
-        const utilityCount = this.properties.filter(p => 
-          p.type === 'utility' && p.ownerId === owner.id
-        ).length;
-        // Rent will be 4x or 10x dice roll, handled elsewhere
-        rent = utilityCount === 2 ? 10 : 4;
-      }
-    }
+    // Get base rent based on development level
+    let rent = property.rentLevels[property.houseCount];
 
-    // Double rent for complete color set (only for regular properties)
-    if (property.type === 'property' && this.isColorSetComplete(property)) {
+    // If no houses but owns all in color group, double rent
+    if (property.houseCount === 0 && !property.hasHotel && this.ownsAllInColorGroup(property)) {
       rent *= 2;
     }
 
     return rent;
   }
 
-  isColorSetComplete(property: Property): boolean {
-    const propertiesInSet = this.getPropertiesInColorSet(property.colorGroup);
-    return propertiesInSet.every(p => 
+  private calculateRailroadRent(property: Property): number {
+    if (!property.ownerId || property.isMortgaged) {
+      return 0;
+    }
+
+    // Count how many railroads the owner has
+    const railroadCount = this.properties.filter(p => 
+      p.type === 'railroad' && 
+      p.ownerId === property.ownerId &&
+      !p.isMortgaged
+    ).length;
+
+    // Railroad rent is 25 * 2^(n-1) where n is the number of railroads owned
+    return 25 * Math.pow(2, railroadCount - 1);
+  }
+
+  private calculateUtilityRent(property: Property): number {
+    if (!property.ownerId || property.isMortgaged) {
+      return 0;
+    }
+
+    // Count how many utilities the owner has
+    const utilityCount = this.properties.filter(p => 
+      p.type === 'utility' && 
+      p.ownerId === property.ownerId &&
+      !p.isMortgaged
+    ).length;
+
+    // Get the last dice roll from the game state
+    // This should be passed in from the game state when calculating utility rent
+    const diceRoll = property.rentAmount || 0;
+
+    // If owner has both utilities, rent is 10 times dice roll
+    // If owner has one utility, rent is 4 times dice roll
+    return diceRoll * (utilityCount === 2 ? 10 : 4);
+  }
+
+  private ownsAllInColorGroup(property: Property): boolean {
+    const propertiesInGroup = this.properties.filter(p => 
+      p.colorGroup === property.colorGroup
+    );
+
+    return propertiesInGroup.every(p => 
       p.ownerId === property.ownerId && !p.isMortgaged
     );
   }
 
-  getPropertiesInColorSet(colorGroup: string): Property[] {
-    return this.properties.filter(p => p.colorGroup === colorGroup);
+  public canBuildHouse(property: Property): boolean {
+    if (property.type !== 'property' || !property.ownerId || property.isMortgaged) {
+      return false;
+    }
+
+    // Must own all properties in color group
+    if (!this.ownsAllInColorGroup(property)) {
+      return false;
+    }
+
+    // Check even building rule
+    const propertiesInGroup = this.properties.filter(p => 
+      p.colorGroup === property.colorGroup
+    );
+
+    const minHouses = Math.min(...propertiesInGroup.map(p => p.houseCount));
+    
+    // Can't build if this property has more houses than others in the group
+    if (property.houseCount > minHouses) {
+      return false;
+    }
+
+    // Maximum 4 houses before hotel
+    if (property.houseCount >= 4) {
+      return false;
+    }
+
+    return true;
   }
 
-  canBuildHouse(property: Property): boolean {
-    if (property.type !== 'property' || property.isMortgaged) return false;
-    if (property.houseCount >= 4) return false;
-    
-    // Must own all properties in color set
-    if (!this.isColorSetComplete(property)) return false;
-    
-    // Must build evenly
-    const propertiesInSet = this.getPropertiesInColorSet(property.colorGroup);
-    const minHouses = Math.min(...propertiesInSet.map(p => p.houseCount));
-    return property.houseCount <= minHouses;
+  public canBuildHotel(property: Property): boolean {
+    if (property.type !== 'property' || !property.ownerId || property.isMortgaged) {
+      return false;
+    }
+
+    // Must own all properties in color group
+    if (!this.ownsAllInColorGroup(property)) {
+      return false;
+    }
+
+    // Must have 4 houses before building hotel
+    if (property.houseCount !== 4) {
+      return false;
+    }
+
+    // Can't already have a hotel
+    if (property.hasHotel) {
+      return false;
+    }
+
+    return true;
   }
 
-  canBuildHotel(property: Property): boolean {
-    if (property.type !== 'property' || property.isMortgaged) return false;
-    if (property.houseCount !== 4 || property.hasHotel) return false;
-    
-    // Must own all properties in color set
-    if (!this.isColorSetComplete(property)) return false;
-    
-    // All properties in set must have 4 houses
-    const propertiesInSet = this.getPropertiesInColorSet(property.colorGroup);
-    return propertiesInSet.every(p => p.houseCount === 4);
+  public canMortgage(property: Property): boolean {
+    if (!property.ownerId || property.isMortgaged) {
+      return false;
+    }
+
+    // Can't mortgage if there are buildings on any property in the color group
+    if (property.type === 'property') {
+      const propertiesInGroup = this.properties.filter(p => 
+        p.colorGroup === property.colorGroup
+      );
+
+      if (propertiesInGroup.some(p => p.houseCount > 0 || p.hasHotel)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  public canUnmortgage(property: Property, playerMoney: number): boolean {
+    if (!property.ownerId || !property.isMortgaged) {
+      return false;
+    }
+
+    // Calculate unmortgage cost (mortgage value plus 10% interest)
+    const unmortgageCost = Math.ceil(property.mortgageValue * 1.1);
+
+    // Check if player can afford it
+    return playerMoney >= unmortgageCost;
   }
 } 

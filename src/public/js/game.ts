@@ -34,6 +34,18 @@ interface GameMessage {
   dice?: number[];
 }
 
+interface PropertyGroup {
+    available: Property[];
+    owned: Property[];
+    yours: Property[];
+}
+
+interface PropertyTabs {
+    available: HTMLDivElement;
+    owned: HTMLDivElement;
+    yours: HTMLDivElement;
+}
+
 export class GameService {
   private gameData: GameData;
   private messageContainer: HTMLElement;
@@ -129,53 +141,50 @@ export class GameService {
   }
 
   private initializeEventListeners(): void {
-    // Game title click handler
-    const gameTitle = document.querySelector('.game-title');
-    if (gameTitle) {
-      gameTitle.addEventListener('click', () => {
-        window.location.href = '/lobby';
-      });
-    }
-
-    // Game status click handler
-    const statusElement = document.querySelector('.game-status');
-    if (statusElement) {
-      statusElement.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.toggleMessageHistory();
-      });
-    }
-
-    // Close message history when clicking outside
-    document.addEventListener('click', (e) => {
-      const history = document.querySelector('.message-history');
-      const status = document.querySelector('.game-status');
-      
-      if (history?.classList.contains('show') && 
-          !history.contains(e.target as Node) && 
-          !status?.contains(e.target as Node)) {
-        this.toggleMessageHistory();
-      }
-    });
-
-    // Rules button click handler
-    const viewRulesButton = document.getElementById('view-rules');
-    if (viewRulesButton) {
-      viewRulesButton.addEventListener('click', () => this.showRules());
-    }
-
-    // Roll button click handler
+    // Remove existing listeners first
     const rollButton = document.getElementById('roll-dice');
+    const endTurnButton = document.getElementById('end-turn');
+    const viewRulesButton = document.getElementById('view-rules');
+    const gameTitle = document.querySelector('.game-title');
+    const statusElement = document.querySelector('.game-status');
+
+    // Clone and replace elements to remove old listeners
     if (rollButton) {
-      console.log('Attaching roll button event listener');
-      rollButton.addEventListener('click', () => this.rollDice());
+        const newRollButton = rollButton.cloneNode(true);
+        rollButton.parentNode?.replaceChild(newRollButton, rollButton);
+        newRollButton.addEventListener('click', () => {
+            if (this._isProcessingRoll) return;
+            this.rollDice();
+        });
     }
 
-    // End turn button click handler
-    const endTurnButton = document.getElementById('end-turn');
     if (endTurnButton) {
-      console.log('Attaching end turn button event listener');
-      endTurnButton.addEventListener('click', () => this.endTurn());
+        const newEndButton = endTurnButton.cloneNode(true);
+        endTurnButton.parentNode?.replaceChild(newEndButton, endTurnButton);
+        newEndButton.addEventListener('click', () => this.endTurn());
+    }
+
+    if (viewRulesButton) {
+        const newRulesButton = viewRulesButton.cloneNode(true);
+        viewRulesButton.parentNode?.replaceChild(newRulesButton, viewRulesButton);
+        newRulesButton.addEventListener('click', () => this.showRules());
+    }
+
+    if (gameTitle) {
+        const newTitle = gameTitle.cloneNode(true);
+        gameTitle.parentNode?.replaceChild(newTitle, gameTitle);
+        newTitle.addEventListener('click', () => {
+            window.location.href = '/lobby';
+        });
+    }
+
+    if (statusElement) {
+        const newStatus = statusElement.cloneNode(true);
+        statusElement.parentNode?.replaceChild(newStatus, statusElement);
+        newStatus.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleMessageHistory();
+        });
     }
   }
 
@@ -200,30 +209,18 @@ export class GameService {
 
   private async rollDice(): Promise<void> {
     console.log('=== Roll Dice Started ===');
-    console.log('Game state:', {
-      phase: this.gameData.gameState.phase,
-      currentPlayerIndex: this.gameData.gameState.current_player_index,
-      diceRolls: this.gameData.gameState.dice_rolls,
-      turnOrder: this.gameData.gameState.turn_order
-    });
-    
     const rollDiceButton = document.getElementById('roll-dice') as HTMLButtonElement;
-    const endTurnButton = document.getElementById('end-turn') as HTMLButtonElement;
-    
-    if (rollDiceButton) {
-      rollDiceButton.disabled = true;
-      console.log('Roll button disabled');
-    } else {
-      console.log('Roll button not found');
-    }
+    if (rollDiceButton) rollDiceButton.disabled = true;
 
     try {
-      console.log('Sending roll request to server...');
       const response = await fetch(`/game/${this.gameData.gameId}/roll`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          playerId: this.gameData.currentPlayerId
+        })
       });
 
       if (!response.ok) {
@@ -236,6 +233,11 @@ export class GameService {
 
       const data: RollResponse = await response.json();
       console.log('Roll response received:', data);
+      
+      if (!data.gameState) {
+        console.error('No game state received in roll response');
+        return;
+      }
       
       if (data.gameState.phase === GAME_PHASES.WAITING) {
         console.log('Handling initial roll phase');
@@ -261,31 +263,33 @@ export class GameService {
       players: data.players?.map((p: Player) => ({
         id: p.id,
         username: p.username,
-        isBot: p.is_bot
+        isBot: p.isBot
       }))
     });
     
+    // Ensure we have game state
+    if (!data.gameState) {
+      console.error('No game state received in initial roll phase');
+      return;
+    }
+
     // Update game state
     this.gameData.gameState = data.gameState;
     
     // Update all players if provided
     if (data.players) {
       this.gameData.players = data.players;
-      console.log('Updated players list:', this.gameData.players.map(p => ({
-        id: p.id,
-        username: p.username,
-        isBot: p.is_bot
-      })));
+      console.log('Updated players list:', this.gameData.players);
     }
 
-    // Show roll result with delay
+    // Show roll message with delay
     await this.showMessageWithDelay(`You rolled ${data.dice[0]} and ${data.dice[1]} (total: ${data.roll})!`, 1000);
 
     // If this was the human player's roll, trigger bot rolls sequentially
-    if (this.gameData.gameState.dice_rolls.length === 1) {
+    if (this.gameData.gameState.diceRolls.length === 1) {
       console.log('First roll detected, triggering bot rolls...');
       const botsToRoll = this.gameData.players.filter(p => 
-        p.is_bot && !this.gameData.gameState.dice_rolls.some(r => r.id === p.id)
+        p.isBot && !this.gameData.gameState.diceRolls.some(r => r.id === p.id)
       );
       
       console.log('Bots that need to roll:', botsToRoll.map(b => b.username));
@@ -299,14 +303,14 @@ export class GameService {
     }
 
     // Check if we need to reroll due to ties
-    if (this.gameData.gameState.phase === 'waiting' && this.gameData.gameState.dice_rolls.length === 0) {
-      console.log('Tie detected, handling rerolls...');
+    if (this.gameData.gameState.phase === 'waiting' && this.gameData.gameState.diceRolls.length === 0) {
+      console.log('Tie detected, handling rerolls...', {
+        gameState: this.gameData.gameState,
+        players: this.gameData.players
+      });
       
-      // Show tie message
       await this.showMessageWithDelay('Tie detected! Players need to reroll.', 1500);
-      
-      // Show current roll results before reroll
-      const tiedRoll = data.roll;  // This is the roll value that caused the tie
+      const tiedRoll = data.roll;
       await this.showMessageWithDelay(`Both players rolled ${tiedRoll}!`, 800);
       await this.showMessageWithDelay('Starting reroll...', 1000);
       
@@ -316,18 +320,26 @@ export class GameService {
         rollDiceButton.disabled = false;
         console.log('Enabling roll button for reroll');
       }
-    } else if (this.gameData.gameState.turn_order.length > 0) {
+
+      // If the current player is a bot, trigger their roll
+      const currentPlayer = this.getNextPlayer();
+      if (currentPlayer?.isBot) {
+        console.log('Bot needs to reroll first:', currentPlayer);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await this.rollForBot(currentPlayer.id);
+      }
+    } else if (this.gameData.gameState.turnOrder.length > 0) {
       // No ties, proceed with turn order display
       await this.showMessageWithDelay(`Determining turn order...`, 1500);
       
       // Sort players by their roll values and match with player names
-      const rollResults = this.gameData.gameState.dice_rolls
+      const rollResults = this.gameData.gameState.diceRolls
         .map(roll => {
           const player = this.gameData.players.find(p => p.id === roll.id);
           return {
             username: player?.username || 'Unknown',
             roll: roll.roll || 0,
-            isBot: player?.is_bot || false,
+            isBot: player?.isBot || false,
             id: roll.id
           };
         })
@@ -348,28 +360,40 @@ export class GameService {
       await this.showMessageWithDelay(`Game starting...`, 1500);
       
       // Get the first player
-      const firstPlayer = this.gameData.players.find(p => p.id === this.gameData.gameState.turn_order[0]);
+      const firstPlayer = this.gameData.players.find(p => p.id === this.gameData.gameState.turnOrder[0]);
       if (firstPlayer) {
-        const playerType = firstPlayer.is_bot ? '🤖' : '👤';
+        const playerType = firstPlayer.isBot ? '🤖' : '👤';
         await this.showMessageWithDelay(`${firstPlayer.username}${playerType} goes first!`, 1000);
         await this.showMessageWithDelay(`Starting first turn...`, 1000);
+        
+        // Important: Wait for all messages and state updates to complete
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Get fresh game state before proceeding
+        await this.getLatestGameState();
         
         // Update UI before processing first turn
         this.updateGameStatus();
         this.updatePlayersStatus();
         
-        // If first player is a bot, wait before starting their turn
-        if (firstPlayer.is_bot && this.gameData.gameState.phase === 'playing') {
-          console.log('First player is a bot, waiting before starting their turn...');
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          await this.processBotTurn(firstPlayer);
-        } else if (!firstPlayer.is_bot && firstPlayer.id === this.gameData.currentPlayerId) {
-          // Enable controls for human player
-          const rollButton = document.getElementById('roll-dice') as HTMLButtonElement;
-          if (rollButton) {
-            rollButton.disabled = false;
-            console.log('Enabling roll button for first player');
-          }
+        // Only start bot turn if we're definitely in playing phase and it's their turn
+        if (firstPlayer.isBot && 
+            this.gameData.gameState.phase === 'playing' && 
+            this.gameData.gameState.currentPlayerIndex === 0) {
+            console.log('First player is a bot, ensuring game state before starting turn...');
+            // Additional wait to ensure all messages are displayed
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Only process bot turn if still in playing phase
+            if (this.gameData.gameState.phase === 'playing') {
+                await this.processBotTurn(firstPlayer);
+            }
+        } else if (!firstPlayer.isBot && firstPlayer.id === this.gameData.currentPlayerId) {
+            // Enable controls for human player
+            const rollButton = document.getElementById('roll-dice') as HTMLButtonElement;
+            if (rollButton) {
+                rollButton.disabled = false;
+                console.log('Enabling roll button for first player');
+            }
         }
       }
     }
@@ -381,7 +405,7 @@ export class GameService {
     console.log('=== Initial Roll Phase Completed ===\n');
   }
 
-  private async handleGameplayRoll(response: any): Promise<void> {
+  private async handleGameplayRoll(response: RollResponse): Promise<void> {
     console.log('\n=== Handling Gameplay Roll ===');
     console.log('Call stack:', new Error().stack);
     console.log('Current processing state:', {
@@ -415,12 +439,21 @@ export class GameService {
         isDoubles,
         newPosition,
         spaceAction,
-        currentPlayer
+        currentPlayer,
+        gameState
       });
 
-      // Update game state first
-      this.gameData.gameState = gameState;
-      this.gameData.players = players;
+      // Update game state if provided
+      if (gameState) {
+        this.gameData.gameState = gameState;
+      } else {
+        console.warn('No game state received in gameplay roll');
+      }
+      
+      // Update players if provided
+      if (players) {
+        this.gameData.players = players;
+      }
 
       // Show roll message
       console.log('Player movement:', {
@@ -438,109 +471,169 @@ export class GameService {
         dice
       });
 
-      // Update player position
+      // Update player position with animation
       console.log('Updating player position:', {
         playerId: currentPlayer.id,
         newPosition
       });
       
       const playerIndex = this.gameData.players.findIndex(p => p.id === currentPlayer.id);
-      this.board.updatePlayerPosition(currentPlayer.id, newPosition, playerIndex);
+      await this.board.updatePlayerPosition(currentPlayer.id, newPosition, playerIndex);
+
+      // Wait for animation to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Process space action if any
       if (spaceAction) {
         console.log('Processing space action:', spaceAction);
-        await this.processSpaceAction(spaceAction, currentPlayer);
+        await this.handleSpaceAction(spaceAction, currentPlayer);
       }
 
       // Enable end turn button if it's the player's turn
       if (!this.isCurrentPlayerBot()) {
         console.log('End turn button enabled');
-        const endTurnButton = document.getElementById('end-turn-button') as HTMLButtonElement;
+        const endTurnButton = document.getElementById('end-turn') as HTMLButtonElement;
         if (endTurnButton) {
           endTurnButton.disabled = false;
         }
       }
 
-      console.log('Roll processing complete');
+      // Update UI
+      this.updateGameStatus();
+      this.updatePlayersStatus();
+      this.updatePropertiesPanel();
+
     } catch (error) {
-      console.error('Error processing roll:', error);
+      console.error('Error handling gameplay roll:', error);
     } finally {
       this._isProcessingRoll = false;
+      console.log('=== Gameplay Roll Completed ===\n');
     }
   }
 
-  private async processSpaceAction(action: any, player: any): Promise<void> {
+  private async handleSpaceAction(spaceAction: any, currentPlayer: any): Promise<void> {
     console.log('\n=== Processing Space Action ===');
-    console.log('Space action details:', action);
-
-    if (action.type === 'purchase_available') {
-      const property = action.property;
-      
-      // Show purchase dialog for human players
-      if (!player.is_bot) {
-        const purchaseDialog = document.createElement('div');
-        purchaseDialog.className = 'purchase-dialog';
-        purchaseDialog.innerHTML = `
-          <div class="purchase-content">
-            <h3>Purchase Property</h3>
-            <p>${property.name} is available for $${property.price}</p>
-            <div class="purchase-buttons">
-              <button id="buy-property">Buy</button>
-              <button id="skip-purchase">Skip</button>
-            </div>
-          </div>
-        `;
-        
-        document.body.appendChild(purchaseDialog);
-
-        // Add event listeners
-        const buyButton = purchaseDialog.querySelector('#buy-property');
-        const skipButton = purchaseDialog.querySelector('#skip-purchase');
-
-        if (buyButton && skipButton) {
-          buyButton.addEventListener('click', async () => {
-            try {
-              const response = await fetch(`/game/${this.gameData.gameId}/property/buy`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  playerId: player.id,
-                  position: property.position
-                })
-              });
-
-              const result = await response.json();
-              if (result.success) {
-                this.showMessage({
-                  type: 'purchase',
-                  player,
-                  property: result.property
-                });
-                this.updatePlayers(result.players);
-              } else {
-                this.showMessage({
-                  type: 'error',
-                  message: result.error || 'Failed to purchase property'
-                });
-              }
-            } catch (error) {
-              console.error('Purchase error:', error);
-              this.showMessage({
-                type: 'error',
-                message: 'Failed to purchase property'
-              });
-            } finally {
-              purchaseDialog.remove();
-            }
-          });
-
-          skipButton.addEventListener('click', () => {
-            purchaseDialog.remove();
-          });
-        }
-      }
+    console.log('Space action details:', spaceAction);
+    console.log('Current game phase:', this.gameData.gameState.phase);
+    
+    // Don't process any space actions during waiting phase
+    if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
+        console.log('Skipping space action during waiting phase');
+        return;
     }
+    
+    if (spaceAction.type === 'card_drawn') {
+        // Store current position before card action
+        const currentPosition = currentPlayer.position;
+        
+        // Show card message
+        await this.showMessageWithDelay(
+            `${currentPlayer.username} drew a card: ${spaceAction.card.text}`,
+            1500
+        );
+        
+        // Show action result
+        await this.showMessageWithDelay(spaceAction.message, 1500);
+        
+        // Update game state but preserve position unless explicitly changed by card
+        if (spaceAction.card.action?.type === 'get_out_of_jail') {
+            // For Get Out of Jail Free card, ensure position doesn't change
+            currentPlayer.position = currentPosition;
+        }
+    } else if (spaceAction.type === 'pay_tax') {
+        // Process tax payment
+        try {
+            const response = await fetch(`/game/${this.gameData.gameId}/tax/pay`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    playerId: currentPlayer.id,
+                    taxAmount: spaceAction.tax.amount
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                await this.showMessageWithDelay(error.error || 'Failed to pay tax', 1500);
+                return;
+            }
+
+            const data = await response.json();
+            
+            // Update game data
+            if (data.players) {
+                this.gameData.players = data.players;
+            }
+            if (data.gameState) {
+                this.gameData.gameState = data.gameState;
+            }
+
+            // Show tax payment message
+            await this.showMessageWithDelay(
+                `${currentPlayer.username} paid $${spaceAction.tax.amount} ${spaceAction.tax.name}`,
+                1500
+            );
+        } catch (error) {
+            console.error('Tax payment error:', error);
+            await this.showMessageWithDelay('Failed to process tax payment', 1500);
+        }
+    } else if (spaceAction.type === 'purchase_available') {
+        const property = spaceAction.property;
+        
+        // Show purchase dialog for human players
+        if (!currentPlayer.isBot) {
+            // Get fresh property state before showing dialog
+            const propertyStateResponse = await fetch(`/game/${this.gameData.gameId}/property/${property.position}`);
+            if (!propertyStateResponse.ok) {
+                console.error('Failed to get property state:', propertyStateResponse.status);
+                return;
+            }
+            
+            const propertyState = await propertyStateResponse.json();
+            if (propertyState.ownerId !== null) {
+                console.log('Property already owned, skipping purchase dialog');
+                return;
+            }
+            
+            const purchaseDialog = document.createElement('div');
+            purchaseDialog.className = 'purchase-dialog';
+            purchaseDialog.innerHTML = `
+                <div class="purchase-content">
+                    <h3>Purchase Property</h3>
+                    <p>${property.name} is available for $${property.price}</p>
+                    <div class="purchase-buttons">
+                        <button id="buy-property">Buy</button>
+                        <button id="skip-purchase">Skip</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(purchaseDialog);
+
+            // Add event listeners
+            const buyButton = purchaseDialog.querySelector('#buy-property');
+            const skipButton = purchaseDialog.querySelector('#skip-purchase');
+
+            if (buyButton && skipButton) {
+                buyButton.addEventListener('click', async () => {
+                    purchaseDialog.remove();
+                    await this.buyProperty(property.position);
+                });
+
+                skipButton.addEventListener('click', () => {
+                    purchaseDialog.remove();
+                });
+            }
+        }
+    }
+
+    // Update UI after any space action
+    await this.updateBoard();
+    await this.updateGameStatus();
+    await this.updatePlayersStatus();
+    await this.updatePropertiesPanel();
   }
 
   private async showPurchaseDialog(propertyName: string, price: number | undefined, playerBalance: number): Promise<boolean> {
@@ -606,59 +699,94 @@ export class GameService {
   }
 
   private async buyProperty(position: number): Promise<void> {
+    console.log('=== Buy Property Started ===');
+    console.log('Attempting to buy property at position:', position);
+
     try {
-      console.log('Attempting to buy property at position:', position);
-      
-      // First verify property state
-      const propertyStateResponse = await fetch(`/game/${this.gameData.gameId}/property/${position}`);
-      if (!propertyStateResponse.ok) {
-        const error = await propertyStateResponse.json();
-        await this.showMessage(error.error || 'Failed to verify property state');
-        return;
-      }
+        // Get current player
+        const currentPlayer = this.getCurrentPlayer();
+        if (!currentPlayer) {
+            console.error('No current player found');
+            return;
+        }
 
-      const propertyState = await propertyStateResponse.json();
-      console.log('Property state before purchase:', propertyState);
-      
-      if (propertyState.owner_id !== null) {
-        await this.showMessage('This property is already owned');
-        return;
-      }
-
-      const response = await fetch(`/game/${this.gameData.gameId}/property/buy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ position })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        await this.showMessage(error.error || 'Failed to buy property');
-        return;
-      }
-
-      const data = await response.json();
-      console.log('Purchase response:', data);
-      
-      if (data.success) {
-        // Update game data
-        this.gameData.players = data.players;
-        this.gameData.properties = data.properties;
-
-        // Show success message
-        await this.showMessage(`Successfully purchased ${data.property.name}!`);
+        // Get latest game state
+        await this.getLatestGameState();
+        console.log('Latest game state:', this.gameData.gameState);
 
         // Update UI
-        await this.updateBoard();
-        await this.updateGameStatus();
-        await this.updatePlayersStatus();
-        await this.updatePropertiesPanel();
-      }
+        this.updateBoard();
+        this.updateGameStatus();
+        this.updatePlayersStatus();
+        this.updatePropertiesPanel();
+
+        // Check property state
+        const propertyStateResponse = await fetch(`/game/${this.gameData.gameId}/property/${position}`);
+        if (!propertyStateResponse.ok) {
+            throw new Error('Failed to get property state');
+        }
+
+        const propertyState = await propertyStateResponse.json();
+        console.log('Property state before purchase:', propertyState);
+        
+        if (propertyState.ownerId !== null) {
+            console.error('Property already owned:', {
+                property: propertyState,
+                currentOwner: propertyState.ownerId
+            });
+            await this.showMessage('This property is already owned');
+            return;
+        }
+
+        // Verify player can afford the property
+        if (currentPlayer.balance < propertyState.price) {
+            console.error('Insufficient funds:', {
+                balance: currentPlayer.balance,
+                price: propertyState.price
+            });
+            await this.showMessage('Insufficient funds to purchase this property');
+            return;
+        }
+
+        // Attempt to purchase
+        console.log('Sending purchase request:', {
+            position
+        });
+        
+        const response = await fetch(`/game/${this.gameData.gameId}/property/buy`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ position })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Purchase request failed:', error);
+            this.showMessage(error.error || 'Failed to purchase property');
+            return;
+        }
+
+        const result = await response.json();
+        console.log('Purchase successful:', result);
+
+        // Update game state with new property ownership
+        await this.getLatestGameState();
+
+        // Show success message
+        await this.showMessage(`Successfully purchased ${propertyState.name} for $${propertyState.price}`);
+
+        // Update UI
+        this.updateBoard();
+        this.updateGameStatus();
+        this.updatePlayersStatus();
+        this.updatePropertiesPanel();
+
+        console.log('=== Buy Property Completed ===');
     } catch (error) {
-      console.error('Buy property error:', error);
-      await this.showMessage('Failed to buy property');
+        console.error('Error during property purchase:', error);
+        this.showMessage('Failed to purchase property');
     }
   }
 
@@ -783,22 +911,22 @@ export class GameService {
       console.log('Current player in waiting phase:', currentPlayer ? {
         id: currentPlayer.id,
         username: currentPlayer.username,
-        isBot: currentPlayer.is_bot
+        isBot: currentPlayer.isBot
       } : 'undefined');
     } else {
       currentPlayer = this.getNextPlayer();
       console.log('Current player in playing phase:', currentPlayer ? {
         id: currentPlayer.id,
         username: currentPlayer.username,
-        isBot: currentPlayer.is_bot
+        isBot: currentPlayer.isBot
       } : 'undefined');
     }
     
     console.log('Current game state:', {
       phase: this.gameData.gameState.phase,
-      currentPlayerIndex: this.gameData.gameState.current_player_index,
-      turnOrder: this.gameData.gameState.turn_order,
-      diceRolls: this.gameData.gameState.dice_rolls
+      currentPlayerIndex: this.gameData.gameState.currentPlayerIndex,
+      turnOrder: this.gameData.gameState.turnOrder,
+      diceRolls: this.gameData.gameState.diceRolls
     });
     
     if (currentPlayer) {
@@ -808,10 +936,10 @@ export class GameService {
     let statusText = '';
     
     if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
-      const rollCount = this.gameData.gameState.dice_rolls.length;
+      const rollCount = this.gameData.gameState.diceRolls.length;
       const totalPlayers = this.gameData.players.length;
       
-      if (rollCount === 0 && this.gameData.gameState.last_roll !== undefined) {
+      if (rollCount === 0 && this.gameData.gameState.lastRoll !== undefined) {
         statusText = `Tie detected! Players need to reroll (${rollCount}/${totalPlayers} players rolled)`;
       } else {
         statusText = `Initial Roll Phase - Roll to determine turn order (${rollCount}/${totalPlayers} players rolled)`;
@@ -859,17 +987,17 @@ export class GameService {
     
     // In waiting phase, player can roll if they haven't rolled yet
     if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
-      const hasRolled = this.gameData.gameState.dice_rolls.some(r => r.id === currentPlayer.id);
+      const hasRolled = this.gameData.gameState.diceRolls.some(r => r.id === currentPlayer.id);
       const isCurrentUser = currentPlayer.id === this.gameData.currentPlayerId;
-      const isBot = currentPlayer.is_bot;
+      const isBot = currentPlayer.isBot;
       return !hasRolled && isCurrentUser && !isBot;
     }
     
     // In playing phase, current player can roll if it's their turn and hasn't rolled yet
-    const isCurrentTurn = currentPlayer.id === this.gameData.gameState.turn_order[this.gameData.gameState.current_player_index];
+    const isCurrentTurn = currentPlayer.id === this.gameData.gameState.turnOrder[this.gameData.gameState.currentPlayerIndex];
     const isCurrentUser = currentPlayer.id === this.gameData.currentPlayerId;
-    const hasRolled = this.gameData.gameState.last_roll !== undefined;
-    const isBot = currentPlayer.is_bot;
+    const hasRolled = this.gameData.gameState.lastRoll !== undefined;
+    const isBot = currentPlayer.isBot;
     
     return isCurrentTurn && isCurrentUser && !hasRolled && !isBot;
   }
@@ -882,10 +1010,10 @@ export class GameService {
       return false;
     }
     
-    const isCurrentTurn = currentPlayer.id === this.gameData.gameState.turn_order[this.gameData.gameState.current_player_index];
+    const isCurrentTurn = currentPlayer.id === this.gameData.gameState.turnOrder[this.gameData.gameState.currentPlayerIndex];
     const isCurrentUser = currentPlayer.id === this.gameData.currentPlayerId;
-    const hasRolled = this.gameData.gameState.last_roll !== undefined;
-    const isBot = currentPlayer.is_bot;
+    const hasRolled = this.gameData.gameState.lastRoll !== undefined;
+    const isBot = currentPlayer.isBot;
     
     return isCurrentTurn && isCurrentUser && hasRolled && !isBot;
   }
@@ -922,14 +1050,14 @@ export class GameService {
       
       const playerCard = document.createElement('div');
       playerCard.className = `player-card player-color-${index}`;
-      if (p.id === this.gameData.gameState.turn_order[this.gameData.gameState.current_player_index]) {
+      if (p.id === this.gameData.gameState.turnOrder[this.gameData.gameState.currentPlayerIndex]) {
         playerCard.classList.add('current-player');
       }
       
       // Create avatar
       const avatar = document.createElement('div');
       avatar.className = 'player-avatar';
-      avatar.textContent = p.is_bot ? '🤖' : '👤';
+      avatar.textContent = p.isBot ? '🤖' : '👤';
       
       // Create info section
       const info = document.createElement('div');
@@ -990,7 +1118,7 @@ export class GameService {
       status.className = 'roll-status';
       
       // Show jail free card status if any
-      const jailFreeCards = this.gameData.gameState.jail_free_cards?.[p.id] || 0;
+      const jailFreeCards = this.gameData.gameState.jailFreeCards?.[p.id] || 0;
       if (jailFreeCards > 0) {
         const jailCard = document.createElement('div');
         jailCard.className = 'jail-free-card';
@@ -1001,20 +1129,20 @@ export class GameService {
       // Add roll status text based on game phase
       let statusText = '';
       if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
-        const allRolls = this.gameData.gameState.dice_rolls;
+        const allRolls = this.gameData.gameState.diceRolls;
         const playerRoll = allRolls.find(r => r.id === p.id);
         
         if (playerRoll) {
           statusText = `Rolled: ${playerRoll.dice ? `${playerRoll.dice[0]} + ${playerRoll.dice[1]} = ${playerRoll.roll}` : playerRoll.roll}`;
-        } else if (allRolls.length === 0 && this.gameData.gameState.last_roll !== undefined) {
-          statusText = `Previous: ${this.gameData.gameState.last_roll} (Tied)`;
+        } else if (allRolls.length === 0 && this.gameData.gameState.lastRoll !== undefined) {
+          statusText = `Previous: ${this.gameData.gameState.lastRoll} (Tied)`;
         } else {
           statusText = 'Waiting for roll...';
         }
       } else {
-        if (p.id === this.gameData.gameState.turn_order[this.gameData.gameState.current_player_index]) {
-          statusText = this.gameData.gameState.last_roll ? 
-            `Current turn (rolled ${this.gameData.gameState.last_roll})` : 
+        if (p.id === this.gameData.gameState.turnOrder[this.gameData.gameState.currentPlayerIndex]) {
+          statusText = this.gameData.gameState.lastRoll ? 
+            `Current turn (rolled ${this.gameData.gameState.lastRoll})` : 
             'Current turn';
         } else {
           statusText = 'Waiting';
@@ -1041,61 +1169,80 @@ export class GameService {
   }
 
   private async processBotTurn(bot: Player): Promise<void> {
-    // Early check for processing state
-    if (this.isProcessingBotTurn) {
-      console.log('Already processing a bot turn, skipping');
-      return;
+    // Early check for processing state and game phase
+    if (this.isProcessingBotTurn || this.gameData.gameState.phase !== 'playing') {
+        console.log('Skipping bot turn:', {
+            isProcessing: this.isProcessingBotTurn,
+            gamePhase: this.gameData.gameState.phase
+        });
+        return;
     }
 
     console.log('=== Processing Bot Turn Started ===');
     console.log('Bot details:', {
-      id: bot.id,
-      username: bot.username,
-      position: bot.position,
-      balance: bot.balance,
-      gamePhase: this.gameData.gameState.phase,
-      currentPlayerIndex: this.gameData.gameState.current_player_index
+        id: bot.id,
+        username: bot.username,
+        position: bot.position,
+        balance: bot.balance,
+        gamePhase: this.gameData.gameState.phase,
+        currentPlayerIndex: this.gameData.gameState.currentPlayerIndex
     });
 
     // Set processing flag before any async operations
     this.isProcessingBotTurn = true;
 
     try {
-      // Verify it's still the bot's turn
-      const currentPlayer = this.getNextPlayer();
-      if (!currentPlayer || currentPlayer.id !== bot.id) {
-        console.log('No longer bot\'s turn, skipping');
-        return;
-      }
+        // Get fresh game state before proceeding
+        await this.getLatestGameState();
 
-      // Get fresh game state before proceeding
-      await this.getLatestGameState();
+        // Verify it's still the bot's turn and we're in playing phase
+        const currentPlayer = this.getNextPlayer();
+        if (!currentPlayer || 
+            currentPlayer.id !== bot.id || 
+            this.gameData.gameState.phase !== 'playing' ||
+            currentPlayer.id !== this.gameData.gameState.turnOrder[this.gameData.gameState.currentPlayerIndex]) {
+            console.log('Bot turn verification failed:', {
+                expected: bot.id,
+                actual: currentPlayer?.id,
+                phase: this.gameData.gameState.phase,
+                currentIndex: this.gameData.gameState.currentPlayerIndex,
+                turnOrder: this.gameData.gameState.turnOrder
+            });
+            return;
+        }
 
-      // Roll dice
-      console.log('Rolling for bot...');
-      await this.showMessageWithDelay(`${bot.username}'s turn`, 1000);
-      await this.rollForBot(bot.id);
+        // Ensure all previous messages are processed
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Wait for roll animation and messages
-      await new Promise(resolve => setTimeout(resolve, 1500));
+        // Roll dice
+        console.log('Rolling for bot...');
+        await this.showMessageWithDelay(`${bot.username}'s turn`, 1000);
+        await this.rollForBot(bot.id);
 
-      // Make property decisions
-      console.log('Making bot decisions...');
-      await this.makeBotDecisions(bot);
+        // Wait for roll animation and messages
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Wait for decision messages
-      await new Promise(resolve => setTimeout(resolve, 1500));
+        // Verify game state again before making decisions
+        await this.getLatestGameState();
+        if (this.gameData.gameState.phase === 'playing' && 
+            currentPlayer.id === this.gameData.gameState.turnOrder[this.gameData.gameState.currentPlayerIndex]) {
+            // Make property decisions
+            console.log('Making bot decisions...');
+            await this.makeBotDecisions(bot);
 
-      // End turn
-      console.log('Ending bot turn...');
-      await this.endBotTurn(bot);
+            // Wait for decision messages
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
+            // End turn
+            console.log('Ending bot turn...');
+            await this.endBotTurn(bot);
+        }
     } catch (error) {
-      console.error('Bot turn error:', error);
-      this.showMessage(`${bot.username} encountered an error during their turn`);
+        console.error('Bot turn error:', error);
+        this.showMessage(`${bot.username} encountered an error during their turn`);
     } finally {
-      this.isProcessingBotTurn = false;
-      console.log('=== Processing Bot Turn Completed ===');
+        this.isProcessingBotTurn = false;
+        console.log('=== Processing Bot Turn Completed ===');
     }
   }
 
@@ -1156,9 +1303,9 @@ export class GameService {
       
       // Update game state
       this.gameData.gameState = data.gameState;
-      // Ensure last_roll is cleared for the next turn
-      delete this.gameData.gameState.last_roll;
-      delete this.gameData.gameState.last_position;
+      // Ensure lastRoll is cleared for the next turn
+      delete this.gameData.gameState.lastRoll;
+      delete this.gameData.gameState.lastPosition;
       
       if (data.players) {
         this.gameData.players = data.players;
@@ -1176,14 +1323,14 @@ export class GameService {
       // Show turn transition message
       const nextPlayer = this.gameData.players.find(p => p.id === data.nextPlayerId);
       if (nextPlayer) {
-        const playerType = nextPlayer.is_bot ? '🤖' : '';
+        const playerType = nextPlayer.isBot ? '🤖' : '';
         await this.showMessageWithDelay(
           `${nextPlayer.username}${playerType}'s turn`,
           1000
         );
 
         // If next player is also a bot, process their turn after a short delay
-        if (nextPlayer.is_bot) {
+        if (nextPlayer.isBot) {
           console.log('Next player is also a bot, processing their turn...');
           await new Promise(resolve => setTimeout(resolve, 1000));
           await this.processBotTurn(nextPlayer);
@@ -1208,147 +1355,141 @@ export class GameService {
   private async rollForBot(botId: number): Promise<void> {
     console.log('\n=== Rolling for Bot Started ===');
     console.log('Bot ID:', botId);
+    console.log('Current game phase:', this.gameData.gameState.phase);
     
     // Get bot player
     const bot = this.gameData.players.find(p => p.id === botId);
     if (!bot) {
-      console.error('Bot not found:', {
-        botId,
-        availablePlayers: this.gameData.players.map(p => ({
-          id: p.id,
-          username: p.username,
-          isBot: p.is_bot
-        }))
-      });
-      return;
+        console.error('Bot not found:', {
+            botId,
+            availablePlayers: this.gameData.players.map(p => ({
+                id: p.id,
+                username: p.username,
+                isBot: p.isBot
+            }))
+        });
+        return;
     }
 
     console.log('Found bot player:', {
-      id: bot.id,
-      username: bot.username,
-      isBot: bot.is_bot,
-      position: bot.position,
-      currentRolls: this.gameData.gameState.dice_rolls
+        id: bot.id,
+        username: bot.username,
+        isBot: bot.isBot,
+        position: bot.position,
+        currentRolls: this.gameData.gameState.diceRolls,
+        phase: this.gameData.gameState.phase
     });
 
     try {
-      // Send roll request
-      const response = await fetch(`/game/${this.gameData.gameId}/roll`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ botId: bot.id })
-      });
-
-      console.log('Bot roll response status:', {
-        status: response.status,
-        statusText: response.statusText
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Bot roll failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: error.error,
-          bot: bot.username
+        // Send roll request
+        const response = await fetch(`/game/${this.gameData.gameId}/roll`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ botId: bot.id })
         });
-        throw new Error(error.error || 'Failed to roll for bot');
-      }
 
-      const data = await response.json();
-      console.log('Bot roll response data:', data);
-
-      // Update game state
-      console.log('Updating game state:', {
-        oldState: this.gameData.gameState,
-        newState: data.gameState
-      });
-      this.gameData.gameState = data.gameState;
-
-      // Update players if provided
-      if (data.players) {
-        console.log('Updating players:', {
-          oldPlayers: this.gameData.players,
-          newPlayers: data.players
+        console.log('Bot roll response status:', {
+            status: response.status,
+            statusText: response.statusText
         });
-        this.gameData.players = data.players;
-      }
 
-      // Show roll message with movement details
-      if (typeof bot.position === 'number' && typeof data.newPosition === 'number') {
-        const fromSpace = BOARD_SPACES[bot.position];
-        const toSpace = BOARD_SPACES[data.newPosition];
-        await this.showMessageWithDelay(
-          `${bot.username} rolled ${data.dice[0]} and ${data.dice[1]} (total: ${data.roll})! Moving from ${fromSpace.name} to ${toSpace.name}`,
-          1000
-        );
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Bot roll failed:', {
+                status: response.status,
+                statusText: response.statusText,
+                error: error.error,
+                bot: bot.username
+            });
+            throw new Error(error.error || 'Failed to roll for bot');
+        }
 
-        // Update bot position
-        bot.position = data.newPosition;
-        const botIndex = this.gameData.players.findIndex(p => p.id === bot.id);
-        await this.board.updatePlayerPosition(bot.id, data.newPosition, botIndex);
-      } else {
-        await this.showMessageWithDelay(
-          `${bot.username} rolled ${data.dice[0]} and ${data.dice[1]} (total: ${data.roll})!`,
-          1000
-        );
-      }
+        const data = await response.json();
+        console.log('Bot roll response data:', data);
 
-      // Handle space action if any
-      if (data.spaceAction) {
-        await this.handleSpaceAction(data.spaceAction, bot);
-      }
+        // Show roll message based on game phase BEFORE updating state
+        if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
+            await this.showMessageWithDelay(
+                `${bot.username} rolled ${data.dice[0]} and ${data.dice[1]} (total: ${data.roll})!`,
+                1000
+            );
+        } else if (typeof bot.position === 'number' && typeof data.newPosition === 'number') {
+            const fromSpace = BOARD_SPACES[bot.position];
+            const toSpace = BOARD_SPACES[data.newPosition];
+            await this.showMessageWithDelay(
+                `${bot.username} rolled ${data.dice[0]} and ${data.dice[1]} (total: ${data.roll})! Moving from ${fromSpace.name} to ${toSpace.name}`,
+                1000
+            );
+        }
 
-      // Update UI
-      console.log('Updating UI components');
-      this.updateBoard();
-      this.updateGameStatus();
-      this.updatePlayersStatus();
+        // Update game state AFTER showing message
+        console.log('Updating game state:', {
+            oldState: this.gameData.gameState,
+            newState: data.gameState
+        });
+        this.gameData.gameState = data.gameState;
 
-      console.log('=== Rolling for Bot Completed ===\n');
+        // Update players if provided
+        if (data.players) {
+            console.log('Updating players:', {
+                oldPlayers: this.gameData.players,
+                newPlayers: data.players
+            });
+            this.gameData.players = data.players;
+        }
+
+        // Update bot position only during playing phase
+        if (this.gameData.gameState.phase !== GAME_PHASES.WAITING) {
+            bot.position = data.newPosition;
+            const botIndex = this.gameData.players.findIndex(p => p.id === bot.id);
+            await this.board.updatePlayerPosition(bot.id, data.newPosition, botIndex);
+        }
+
+        // Handle space action only during playing phase
+        if (data.spaceAction && this.gameData.gameState.phase !== GAME_PHASES.WAITING) {
+            await this.handleSpaceAction(data.spaceAction, bot);
+        }
+
+        // Update UI
+        console.log('Updating UI components');
+        this.updateBoard();
+        this.updateGameStatus();
+        this.updatePlayersStatus();
+
+        console.log('=== Rolling for Bot Completed ===\n');
     } catch (error) {
-      console.error('Bot roll error:', {
-        error,
-        bot: bot.username,
-        gameState: this.gameData.gameState
-      });
-      this.showMessage(`${bot.username} encountered an error while rolling`);
+        console.error('Bot roll error:', {
+            error,
+            bot: bot.username,
+            gameState: this.gameData.gameState
+        });
+        this.showMessage(`${bot.username} encountered an error while rolling`);
     }
   }
 
   private async getLatestGameState(): Promise<boolean> {
     try {
-      // Get game ID from URL to ensure we're using the correct one
-      const gameId = window.location.pathname.split('/').pop();
-      if (!gameId) {
-        throw new Error('Could not determine game ID from URL');
-      }
-
-      const stateUrl = `/game/${gameId}/state`;
-      console.log('Fetching game state from:', stateUrl);
-      
-      const response = await fetch(stateUrl, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
+      const response = await fetch(`/game/${this.gameData.gameId}/state`);
       if (!response.ok) {
-        console.error('Failed to get latest game state:', response.status, response.statusText);
+        console.error('Failed to get latest game state:', response.status);
         return false;
       }
       
       const data = await response.json();
-      console.log('Game state received:', data);
+      console.log('Latest game state:', data);
       
-      // Update game state
+      // Update game data
       if (data.gameState) {
         this.gameData.gameState = data.gameState;
       }
       if (data.players) {
         this.gameData.players = data.players;
       }
+      if (data.properties) {
+        this.gameData.properties = data.properties;
+      }
 
-      // Update UI after state change
+      // Update UI
       this.updateBoard();
       this.updateGameStatus();
       this.updatePlayersStatus();
@@ -1637,76 +1778,128 @@ export class GameService {
   }
 
   private updatePropertiesPanel(): void {
-    const propertiesContent = document.querySelector('.panel-content');
-    if (!propertiesContent) return;
+    console.log('=== Updating Properties Panel ===');
+    console.log('Creating properties panel');
+    
+    const propertiesContent = document.querySelector('.properties-section .panel-content');
+    if (!propertiesContent) {
+        console.error('Properties panel content not found');
+        return;
+    }
+
+    // Group properties by ownership with proper typing
+    const propertiesByOwnership = this.gameData.properties.reduce<PropertyGroup>((acc, property) => {
+        if (!property.ownerId) {
+            acc.available.push(property);
+        } else if (property.ownerId === this.gameData.currentPlayerId) {
+            acc.yours.push(property);
+        } else {
+            acc.owned.push(property);
+        }
+        return acc;
+    }, { available: [], owned: [], yours: [] });
+
+    console.log('Properties by ownership:', propertiesByOwnership);
+
+    // Get or create tab content container
+    let tabContent = propertiesContent.querySelector('.tab-content');
+    if (!tabContent) {
+        tabContent = document.createElement('div');
+        tabContent.className = 'tab-content';
+        propertiesContent.appendChild(tabContent);
+    }
 
     // Clear existing content
-    const availableList = propertiesContent.querySelector('.available-properties .property-list');
-    const ownedList = propertiesContent.querySelector('.owned-properties .property-list');
-    
-    if (!availableList || !ownedList) return;
-    
-    availableList.innerHTML = '';
-    ownedList.innerHTML = '';
+    tabContent.innerHTML = '';
 
-    // Group properties by ownership
-    const unownedProperties = this.gameData.properties.filter(p => !p.ownerId);
-    const ownedProperties = this.gameData.properties.filter(p => p.ownerId);
+    // Create content for each tab with proper typing
+    const createPropertyList = (properties: Property[], type: keyof PropertyGroup): HTMLDivElement => {
+        const list = document.createElement('div');
+        list.className = `property-list ${type}-properties`;
+        
+        if (properties.length === 0) {
+            const noProperties = document.createElement('div');
+            noProperties.className = 'no-properties';
+            noProperties.textContent = 'No properties in this category';
+            list.appendChild(noProperties);
+            return list;
+        }
 
-    // Add unowned properties
-    unownedProperties.forEach(property => {
-      const propertyItem = document.createElement('div');
-      propertyItem.className = `property-item property-color-${BOARD_SPACES[property.position].color || BOARD_SPACES[property.position].type}`;
-      
-      propertyItem.innerHTML = `
-        <span class="property-name">${property.name}</span>
-        <span class="property-price">$${property.price}</span>
-      `;
-      
-      availableList.appendChild(propertyItem);
-    });
+        properties.forEach((property: Property) => {
+            const propertyItem = document.createElement('div');
+            propertyItem.className = 'property-item';
+            
+            // Add color indicator based on property type
+            const colorClass = this.getPropertyColorClass(property);
+            propertyItem.classList.add(colorClass);
+            
+            let details = '';
+            if (property.houseCount > 0) {
+                details = property.houseCount === 5 ? '🏨' : '🏠'.repeat(property.houseCount);
+            }
+            if (property.isMortgaged) {
+                details += ' 📝';
+            }
 
-    // Group owned properties by owner
-    const propertiesByOwner = new Map<number, Property[]>();
-    ownedProperties.forEach(property => {
-      if (!propertiesByOwner.has(property.ownerId!)) {
-        propertiesByOwner.set(property.ownerId!, []);
-      }
-      propertiesByOwner.get(property.ownerId!)?.push(property);
-    });
-
-    // Add owned properties grouped by owner
-    this.gameData.players.forEach((player, index) => {
-      const playerProperties = propertiesByOwner.get(player.id) || [];
-      if (playerProperties.length > 0) {
-        const ownerHeader = document.createElement('div');
-        ownerHeader.className = 'owner-header';
-        ownerHeader.style.color = this.board.getPlayerColor(index);
-        ownerHeader.textContent = `${player.username}'s Properties`;
-        ownedList.appendChild(ownerHeader);
-
-        playerProperties.forEach(property => {
-          const propertyItem = document.createElement('div');
-          propertyItem.className = `property-item property-color-${BOARD_SPACES[property.position].color || BOARD_SPACES[property.position].type}`;
-          
-          let details = '';
-          if (property.houseCount > 0) {
-            details = property.houseCount === 5 ? '🏨' : '🏠'.repeat(property.houseCount);
-          }
-          if (property.isMortgaged) {
-            details += ' 📝';
-          }
-
-          propertyItem.innerHTML = `
-            <span class="property-name">${property.name}</span>
-            <span class="property-details">${details}</span>
-            <span class="property-price">$${property.price}</span>
-          `;
-          
-          ownedList.appendChild(propertyItem);
+            propertyItem.innerHTML = `
+                <div class="property-name">${property.name}${details ? ` ${details}` : ''}</div>
+                <div class="property-price">$${property.price}</div>
+            `;
+            list.appendChild(propertyItem);
         });
-      }
+
+        return list;
+    };
+
+    // Add content for each tab with proper typing
+    const tabs: PropertyTabs = {
+        available: createPropertyList(propertiesByOwnership.available, 'available'),
+        owned: createPropertyList(propertiesByOwnership.owned, 'owned'),
+        yours: createPropertyList(propertiesByOwnership.yours, 'yours')
+    };
+
+    // Show the active tab
+    const activeTab = propertiesContent.querySelector('.tab-button.active');
+    const activeTabType = (activeTab?.getAttribute('data-tab') || 'available') as keyof PropertyTabs;
+    tabContent.appendChild(tabs[activeTabType]);
+
+    // Add tab click handlers
+    propertiesContent.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const tabType = (e.target as HTMLElement).getAttribute('data-tab') as keyof PropertyTabs | null;
+            if (!tabType || !tabs[tabType]) return;
+
+            // Update active state
+            propertiesContent.querySelectorAll('.tab-button').forEach(b => 
+                b.classList.remove('active'));
+            (e.target as HTMLElement).classList.add('active');
+
+            // Update content
+            tabContent.innerHTML = '';
+            tabContent.appendChild(tabs[tabType]);
+        });
     });
+
+    console.log('Properties panel updated');
+  }
+
+  private getPropertyColorClass(property: Property): string {
+    if (property.type === 'railroad') return 'color-railroad';
+    if (property.type === 'utility') return 'color-utility';
+    
+    // Map color groups to CSS classes
+    const colorMap: { [key: string]: string } = {
+        'brown': 'color-brown',
+        'light-blue': 'color-light-blue',
+        'pink': 'color-pink',
+        'orange': 'color-orange',
+        'red': 'color-red',
+        'yellow': 'color-yellow',
+        'green': 'color-green',
+        'blue': 'color-blue'
+    };
+    
+    return colorMap[property.colorGroup || ''] || 'color-default';
   }
 
   private async endTurn(): Promise<void> {
@@ -1746,14 +1939,14 @@ export class GameService {
       // Show turn transition message
       const nextPlayer = this.gameData.players.find(p => p.id === data.nextPlayerId);
       if (nextPlayer) {
-        const playerType = nextPlayer.is_bot ? '🤖' : '';
+        const playerType = nextPlayer.isBot ? '🤖' : '';
         await this.showMessageWithDelay(
           `${nextPlayer.username}${playerType}'s turn`,
           1000
         );
 
         // If next player is a bot, process their turn after a short delay
-        if (nextPlayer.is_bot) {
+        if (nextPlayer.isBot) {
           console.log('Next player is a bot, processing their turn...');
           await new Promise(resolve => setTimeout(resolve, 1000));
           await this.processBotTurn(nextPlayer);
@@ -1767,51 +1960,37 @@ export class GameService {
     }
   }
 
-  private async handleSpaceAction(spaceAction: any, currentPlayer: any): Promise<void> {
-    console.log('\n=== Processing Space Action ===');
-    console.log('Space action details:', spaceAction);
-    
-    if (spaceAction.type === 'card_drawn') {
-      // Store current position before card action
-      const currentPosition = currentPlayer.position;
-      
-      // Show card message
-      await this.showMessageWithDelay(
-        `${currentPlayer.username} drew a card: ${spaceAction.card.text}`,
-        1500
-      );
-      
-      // Show action result
-      await this.showMessageWithDelay(spaceAction.message, 1500);
-      
-      // Update game state but preserve position unless explicitly changed by card
-      if (spaceAction.card.action?.type === 'get_out_of_jail') {
-        // For Get Out of Jail Free card, ensure position doesn't change
-        currentPlayer.position = currentPosition;
-      }
-      
-      // Update UI after card action
-      await this.updateBoard();
-      await this.updateGameStatus();
-      await this.updatePlayersStatus();
-      await this.updatePropertiesPanel();
-    } else if (spaceAction.type === 'purchase_available') {
-      // ... rest of the existing handleSpaceAction method ...
-    }
-  }
-
   private getNextPlayer(): Player | undefined {
     // During waiting phase, return the first player who hasn't rolled yet
     if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
-      return this.gameData.players.find((p: Player) => 
-        !this.gameData.gameState.dice_rolls.some(r => r.id === p.id)
-      );
+        const unrolledPlayer = this.gameData.players.find((p: Player) => 
+            !this.gameData.gameState.diceRolls.some(r => r.id === p.id)
+        );
+        console.log('Next player during waiting phase:', {
+            unrolledPlayer,
+            currentRolls: this.gameData.gameState.diceRolls,
+            players: this.gameData.players
+        });
+        return unrolledPlayer;
     }
     
     // During playing phase, return the current player based on turn order
-    return this.gameData.players.find((p: Player) => 
-      p.id === this.gameData.gameState.turn_order[this.gameData.gameState.current_player_index]
+    const currentPlayer = this.gameData.players.find((p: Player) => 
+        p.id === this.gameData.gameState.turnOrder[this.gameData.gameState.currentPlayerIndex]
     );
+    console.log('Next player during playing phase:', {
+        currentPlayer,
+        turnOrder: this.gameData.gameState.turnOrder,
+        currentIndex: this.gameData.gameState.currentPlayerIndex
+    });
+    return currentPlayer;
+  }
+
+  private getCurrentPlayer(): Player | null {
+    if (!this.gameData || !this.gameData.players) return null;
+    
+    const currentIndex = this.gameData.gameState.currentPlayerIndex;
+    return this.gameData.players[currentIndex] || null;
   }
 
   private checkForBotTurn(): void {
@@ -1819,24 +1998,24 @@ export class GameService {
     const currentPlayer = this.getNextPlayer();
     
     if (!currentPlayer) {
-      console.log('No current player found');
-      return;
+        console.log('No current player found');
+        return;
     }
     
     console.log('Current player:', {
-      id: currentPlayer.id,
-      username: currentPlayer.username,
-      isBot: currentPlayer.is_bot,
-      phase: this.gameData.gameState.phase
+        id: currentPlayer.id,
+        username: currentPlayer.username,
+        isBot: currentPlayer.isBot,
+        phase: this.gameData.gameState.phase
     });
 
     // Only process bot turns during playing phase and when not already processing
-    if (currentPlayer.is_bot && 
-        this.gameData.gameState.phase === 'playing' && 
+    if (currentPlayer.isBot && 
+        this.gameData.gameState.phase === GAME_PHASES.PLAYING && 
         !this.isProcessingBotTurn) {
-      console.log('Bot turn detected, processing...');
-      // Use Promise to ensure sequential processing
-      Promise.resolve().then(() => this.processBotTurn(currentPlayer));
+        console.log('Bot turn detected, processing...');
+        // Use Promise to ensure sequential processing
+        Promise.resolve().then(() => this.processBotTurn(currentPlayer));
     }
   }
 
@@ -1847,7 +2026,7 @@ export class GameService {
 
   private isCurrentPlayerBot(): boolean {
     const currentPlayer = this.getNextPlayer();
-    return currentPlayer?.is_bot || false;
+    return currentPlayer?.isBot || false;
   }
 }
 

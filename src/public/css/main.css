@@ -302,6 +302,9 @@ body {
   border-radius: 8px;
   padding: 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .properties-section h2 {
@@ -309,149 +312,169 @@ body {
   color: #333;
 }
 
-.player-properties,
-.unowned-properties {
-  margin-bottom: 1.5rem;
+.properties-section .panel-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
-.player-properties h3,
-.unowned-properties h3 {
-  margin-bottom: 0.5rem;
-  font-size: 1.1rem;
+.properties-section .tab-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.player-properties ul,
-.unowned-properties ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.player-properties li,
-.unowned-properties li {
-  padding: 0.5rem;
+.properties-section .tab-button {
+  padding: 8px 16px;
+  border: none;
+  background: #f0f0f0;
   border-radius: 4px;
-  background: #f8f9fa;
-  margin-bottom: 0.25rem;
-  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.player-properties li:hover,
-.unowned-properties li:hover {
-  background: #e9ecef;
+.properties-section .tab-button.active {
+  background: #0072bb;
+  color: white;
 }
 
-.no-properties {
-  color: #666;
-  font-style: italic;
-  text-align: center;
-  padding: 1rem;
-} 
+.properties-section .tab-button:hover {
+  background: #e0e0e0;
+}
 
-.properties-list {
-  padding: 15px;
-  background: #f5f5f5;
-  border-radius: 8px;
-  max-height: 500px;
+.properties-section .tab-button.active:hover {
+  background: #005c99;
+}
+
+.properties-section .tab-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.property-list {
+  height: 100%;
   overflow-y: auto;
+  padding: 8px;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
 }
 
-.player-properties {
-  margin-bottom: 20px;
-  padding: 15px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+/* Hide scrollbar for Chrome, Safari and Opera */
+.property-list::-webkit-scrollbar {
+  display: none;
 }
 
-.player-properties h3 {
-  margin: 0 0 10px 0;
-  padding-bottom: 8px;
-  border-bottom: 2px solid;
-  font-size: 1.2em;
+/* Show scrollbar on hover */
+.property-list:hover {
+  scrollbar-width: thin; /* Firefox */
+  -ms-overflow-style: auto; /* IE and Edge */
 }
 
-.player-properties ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.property-list:hover::-webkit-scrollbar {
+  display: block;
+  width: 8px;
 }
 
-.player-properties li {
+.property-list:hover::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.property-list:hover::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.property-list:hover::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.property-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px;
-  margin: 5px 0;
-  background: #f9f9f9;
+  padding: 8px 12px;
+  margin: 4px 0;
   border-radius: 4px;
-  border-left: 4px solid;
+  color: #333;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.property-info {
-  flex: 1;
-}
+/* Property Colors - Monopoly Standard Colors */
+.property-item.color-brown { background: linear-gradient(to right, #955436 0%, #955436 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-light-blue { background: linear-gradient(to right, #AAE0FA 0%, #AAE0FA 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-pink { background: linear-gradient(to right, #D93A96 0%, #D93A96 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-orange { background: linear-gradient(to right, #F7941D 0%, #F7941D 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-red { background: linear-gradient(to right, #ED1B24 0%, #ED1B24 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-yellow { background: linear-gradient(to right, #FEF200 0%, #FEF200 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-green { background: linear-gradient(to right, #1FB25A 0%, #1FB25A 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-blue { background: linear-gradient(to right, #0072BB 0%, #0072BB 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-railroad { background: linear-gradient(to right, #000000 0%, #000000 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-utility { background: linear-gradient(to right, #808080 0%, #808080 4px, #f5f5f5 4px, #f5f5f5 100%); }
 
-.property-name {
-  font-weight: bold;
-  display: block;
-}
-
-.property-details {
-  font-size: 0.9em;
-  color: #666;
-}
-
-.property-controls {
-  display: flex;
-  gap: 8px;
-  margin-left: 10px;
-}
-
-.build-controls, .mortgage-controls {
-  display: flex;
-  gap: 4px;
-}
-
-.unowned-properties {
-  padding: 15px;
-  background: white;
-  border-radius: 8px;
+/* Property Item Hover Effect */
+.property-item:hover {
+  transform: translateX(2px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.unowned-properties h3 {
-  margin: 0 0 10px 0;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #ddd;
-  font-size: 1.2em;
+.property-item.color-brown:hover { background: linear-gradient(to right, #955436 0%, #955436 4px, #eee 4px, #eee 100%); }
+.property-item.color-light-blue:hover { background: linear-gradient(to right, #AAE0FA 0%, #AAE0FA 4px, #eee 4px, #eee 100%); }
+.property-item.color-pink:hover { background: linear-gradient(to right, #D93A96 0%, #D93A96 4px, #eee 4px, #eee 100%); }
+.property-item.color-orange:hover { background: linear-gradient(to right, #F7941D 0%, #F7941D 4px, #eee 4px, #eee 100%); }
+.property-item.color-red:hover { background: linear-gradient(to right, #ED1B24 0%, #ED1B24 4px, #eee 4px, #eee 100%); }
+.property-item.color-yellow:hover { background: linear-gradient(to right, #FEF200 0%, #FEF200 4px, #eee 4px, #eee 100%); }
+.property-item.color-green:hover { background: linear-gradient(to right, #1FB25A 0%, #1FB25A 4px, #eee 4px, #eee 100%); }
+.property-item.color-blue:hover { background: linear-gradient(to right, #0072BB 0%, #0072BB 4px, #eee 4px, #eee 100%); }
+.property-item.color-railroad:hover { background: linear-gradient(to right, #000000 0%, #000000 4px, #eee 4px, #eee 100%); }
+.property-item.color-utility:hover { background: linear-gradient(to right, #808080 0%, #808080 4px, #eee 4px, #eee 100%); }
+
+.property-item .property-name {
+  font-weight: 500;
+  padding-left: 8px;
 }
 
-.unowned-properties ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.property-item .property-price {
+  color: #000000;
+  font-weight: normal;
 }
 
-.unowned-properties li {
-  padding: 8px;
-  margin: 5px 0;
-  background: #f9f9f9;
-  border-radius: 4px;
-  border-left: 4px solid #ddd;
+/* Property Details */
+.property-item .property-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* Property color coding */
-.property-color-brown { border-left-color: #8B4513; }
-.property-color-light-blue { border-left-color: #87CEEB; }
-.property-color-pink { border-left-color: #FF69B4; }
-.property-color-orange { border-left-color: #FFA500; }
-.property-color-red { border-left-color: #FF0000; }
-.property-color-yellow { border-left-color: #FFD700; }
-.property-color-green { border-left-color: #008000; }
-.property-color-blue { border-left-color: #0000FF; }
-.property-color-railroad { border-left-color: #000000; }
-.property-color-utility { border-left-color: #808080; } 
+/* House/Hotel Indicators */
+.property-item .house-count {
+  color: #1fb25a;
+  font-size: 0.9em;
+}
+
+.property-item .hotel {
+  color: #ed1b24;
+  font-size: 0.9em;
+}
+
+/* Mortgage Indicator */
+.property-item .mortgaged {
+  color: #666;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+/* No Properties Message */
+.no-properties {
+  text-align: center;
+  color: #666;
+  padding: 12px;
+  font-style: italic;
+}
 
 .message-history {
   position: absolute;

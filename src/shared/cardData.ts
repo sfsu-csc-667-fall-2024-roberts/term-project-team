@@ -1,187 +1,253 @@
-import { Card } from './types';
+import { Card } from '../../shared/types';
 
 export const CHANCE_CARDS: Card[] = [
   {
-    id: 1,
     type: 'chance',
-    text: 'Advance to GO (Collect $200)',
-    action: { type: 'move', destination: 0 }
+    text: 'Advance to GO',
+    action: {
+      type: 'move',
+      destination: 0
+    }
   },
   {
-    id: 2,
     type: 'chance',
-    text: 'Advance to Illinois Avenue. If you pass GO, collect $200',
-    action: { type: 'move', destination: 24 }
+    text: 'Advance to Illinois Avenue',
+    action: {
+      type: 'move',
+      destination: 24
+    }
   },
   {
-    id: 3,
     type: 'chance',
-    text: 'Advance to St. Charles Place. If you pass GO, collect $200',
-    action: { type: 'move', destination: 11 }
+    text: 'Advance to St. Charles Place',
+    action: {
+      type: 'move',
+      destination: 11
+    }
   },
   {
-    id: 4,
     type: 'chance',
-    text: 'Advance to nearest Railroad. If unowned, you may buy it. If owned, pay owner twice the rental',
-    action: { type: 'move_nearest', propertyType: 'railroad' }
+    text: 'Advance to nearest Railroad',
+    action: {
+      type: 'move_to_nearest',
+      propertyType: 'railroad'
+    }
   },
   {
-    id: 5,
     type: 'chance',
-    text: 'Advance to nearest Utility. If unowned, you may buy it. If owned, roll dice and pay owner 10 times the amount shown',
-    action: { type: 'move_nearest', propertyType: 'utility' }
+    text: 'Advance to nearest Utility',
+    action: {
+      type: 'move_to_nearest',
+      propertyType: 'utility'
+    }
   },
   {
-    id: 6,
     type: 'chance',
     text: 'Bank pays you dividend of $50',
-    action: { type: 'collect', value: 50 }
+    action: {
+      type: 'collect',
+      value: 50
+    }
   },
   {
-    id: 7,
     type: 'chance',
-    text: 'Get Out of Jail Free',
-    action: { type: 'get_out_of_jail' }
+    text: 'Get out of Jail Free',
+    action: {
+      type: 'jail_free'
+    }
   },
   {
-    id: 8,
     type: 'chance',
     text: 'Go Back 3 Spaces',
-    action: { type: 'move', value: -3 }
+    action: {
+      type: 'move_relative',
+      value: -3
+    }
   },
   {
-    id: 9,
     type: 'chance',
-    text: 'Go to Jail. Go directly to Jail, do not pass GO, do not collect $200',
-    action: { type: 'jail' }
+    text: 'Go to Jail',
+    action: {
+      type: 'jail'
+    }
   },
   {
-    id: 10,
     type: 'chance',
-    text: 'Make general repairs on all your property. For each house pay $25. For each hotel pay $100',
-    action: { type: 'repair', value: 25, hotelValue: 100 }
+    text: 'Make general repairs on all your property',
+    action: {
+      type: 'repairs',
+      value: 25,
+      hotelValue: 100
+    }
   },
   {
-    id: 11,
     type: 'chance',
-    text: 'Speeding fine $15',
-    action: { type: 'pay', value: 15 }
+    text: 'Pay poor tax of $15',
+    action: {
+      type: 'pay',
+      value: 15
+    }
   },
   {
-    id: 12,
     type: 'chance',
-    text: 'Take a trip to Reading Railroad. If you pass GO, collect $200',
-    action: { type: 'move', destination: 5 }
+    text: 'Take a trip to Reading Railroad',
+    action: {
+      type: 'move',
+      destination: 5
+    }
   },
   {
-    id: 13,
     type: 'chance',
-    text: 'You have been elected Chairman of the Board. Pay each player $50',
-    action: { type: 'pay', collectFromEach: 50 }
+    text: 'Take a walk on the Boardwalk',
+    action: {
+      type: 'move',
+      destination: 39
+    }
   },
   {
-    id: 14,
     type: 'chance',
-    text: 'Your building loan matures. Collect $150',
-    action: { type: 'collect', value: 150 }
+    text: 'You have been elected Chairman of the Board',
+    action: {
+      type: 'collect_from_each',
+      value: 50
+    }
+  },
+  {
+    type: 'chance',
+    text: 'Your building loan matures',
+    action: {
+      type: 'collect',
+      value: 150
+    }
   }
 ];
 
 export const COMMUNITY_CHEST_CARDS: Card[] = [
   {
-    id: 1,
-    type: 'chest',
-    text: 'Advance to GO (Collect $200)',
-    action: { type: 'move', destination: 0 }
+    type: 'community_chest',
+    text: 'Advance to GO',
+    action: {
+      type: 'move',
+      destination: 0
+    }
   },
   {
-    id: 2,
-    type: 'chest',
-    text: 'Bank error in your favor. Collect $200',
-    action: { type: 'collect', value: 200 }
+    type: 'community_chest',
+    text: 'Bank error in your favor',
+    action: {
+      type: 'collect',
+      value: 200
+    }
   },
   {
-    id: 3,
-    type: 'chest',
-    text: 'Doctor\'s fee. Pay $50',
-    action: { type: 'pay', value: 50 }
+    type: 'community_chest',
+    text: 'Doctor\'s fees',
+    action: {
+      type: 'pay',
+      value: 50
+    }
   },
   {
-    id: 4,
-    type: 'chest',
+    type: 'community_chest',
     text: 'From sale of stock you get $50',
-    action: { type: 'collect', value: 50 }
+    action: {
+      type: 'collect',
+      value: 50
+    }
   },
   {
-    id: 5,
-    type: 'chest',
+    type: 'community_chest',
     text: 'Get Out of Jail Free',
-    action: { type: 'get_out_of_jail' }
+    action: {
+      type: 'jail_free'
+    }
   },
   {
-    id: 6,
-    type: 'chest',
-    text: 'Go to Jail. Go directly to jail, do not pass GO, do not collect $200',
-    action: { type: 'jail' }
+    type: 'community_chest',
+    text: 'Go to Jail',
+    action: {
+      type: 'jail'
+    }
   },
   {
-    id: 7,
-    type: 'chest',
-    text: 'Holiday fund matures. Receive $100',
-    action: { type: 'collect', value: 100 }
+    type: 'community_chest',
+    text: 'Grand Opera Night',
+    action: {
+      type: 'collect_from_each',
+      value: 50
+    }
   },
   {
-    id: 8,
-    type: 'chest',
-    text: 'Income tax refund. Collect $20',
-    action: { type: 'collect', value: 20 }
+    type: 'community_chest',
+    text: 'Holiday Fund matures',
+    action: {
+      type: 'collect',
+      value: 100
+    }
   },
   {
-    id: 9,
-    type: 'chest',
-    text: 'It is your birthday. Collect $10 from each player',
-    action: { type: 'collect_from_players', value: 10 }
+    type: 'community_chest',
+    text: 'Income tax refund',
+    action: {
+      type: 'collect',
+      value: 20
+    }
   },
   {
-    id: 10,
-    type: 'chest',
-    text: 'Life insurance matures. Collect $100',
-    action: { type: 'collect', value: 100 }
+    type: 'community_chest',
+    text: 'Life insurance matures',
+    action: {
+      type: 'collect',
+      value: 100
+    }
   },
   {
-    id: 11,
-    type: 'chest',
-    text: 'Pay hospital fees of $100',
-    action: { type: 'pay', value: 100 }
+    type: 'community_chest',
+    text: 'Hospital Fees',
+    action: {
+      type: 'pay',
+      value: 50
+    }
   },
   {
-    id: 12,
-    type: 'chest',
-    text: 'Pay school fees of $50',
-    action: { type: 'pay', value: 50 }
+    type: 'community_chest',
+    text: 'School Fees',
+    action: {
+      type: 'pay',
+      value: 50
+    }
   },
   {
-    id: 13,
-    type: 'chest',
+    type: 'community_chest',
     text: 'Receive $25 consultancy fee',
-    action: { type: 'collect', value: 25 }
+    action: {
+      type: 'collect',
+      value: 25
+    }
   },
   {
-    id: 14,
-    type: 'chest',
-    text: 'You are assessed for street repair. $40 per house. $115 per hotel',
-    action: { type: 'repair', value: 40, hotelValue: 115 }
+    type: 'community_chest',
+    text: 'You are assessed for street repairs',
+    action: {
+      type: 'repairs',
+      value: 40,
+      hotelValue: 115
+    }
   },
   {
-    id: 15,
-    type: 'chest',
-    text: 'You have won second prize in a beauty contest. Collect $10',
-    action: { type: 'collect', value: 10 }
+    type: 'community_chest',
+    text: 'You have won second prize in a beauty contest',
+    action: {
+      type: 'collect',
+      value: 10
+    }
   },
   {
-    id: 16,
-    type: 'chest',
+    type: 'community_chest',
     text: 'You inherit $100',
-    action: { type: 'collect', value: 100 }
+    action: {
+      type: 'collect',
+      value: 100
+    }
   }
 ]; 

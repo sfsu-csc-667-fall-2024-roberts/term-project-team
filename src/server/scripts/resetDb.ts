@@ -14,6 +14,7 @@ async function resetDb() {
       DROP TABLE IF EXISTS users CASCADE;
       DROP TABLE IF EXISTS "session" CASCADE;
       DROP TABLE IF EXISTS "user_sessions" CASCADE;
+      DROP TABLE IF EXISTS migrations CASCADE;
     `);
     console.log('Tables dropped successfully');
 
@@ -24,6 +25,7 @@ async function resetDb() {
       DROP SEQUENCE IF EXISTS players_id_seq CASCADE;
       DROP SEQUENCE IF EXISTS games_id_seq CASCADE;
       DROP SEQUENCE IF EXISTS users_id_seq CASCADE;
+      DROP SEQUENCE IF EXISTS migrations_id_seq CASCADE;
     `);
     console.log('Sequences reset successfully');
 
@@ -37,8 +39,10 @@ async function resetDb() {
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public'
+      AND table_type = 'BASE TABLE'
+      ORDER BY table_name;
     `);
-    console.log('Available tables:', tables.rows.map(r => r.table_name));
+    console.log('Available tables:', tables.rows.map(r => r.table_name).join(', '));
 
     console.log('=== Database Reset Complete ===');
   } catch (error) {

@@ -30,6 +30,7 @@
   padding: 0;
   width: var(--space-size);
   height: var(--space-size);
+  overflow: hidden;
 }
 
 /* Space content wrapper - unified for ALL spaces */
@@ -39,10 +40,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 2px;
-  font-size: 0.6rem;
+  justify-content: flex-start;
+  padding: 0;
+  font-size: 0.48rem;
   text-align: center;
+  position: relative;
 }
 
 /* Corner spaces base styling */
@@ -189,38 +191,56 @@
 
 /* Property color bars */
 .property-color-bar {
-  width: 100%;
-  height: 15%;
+  width: calc(100% - 4px);
+  height: 12px;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
   margin: 0;
+  z-index: 1;
+  border-radius: 2px;
 }
 
 /* Property info */
 .property-info {
-  flex: 1;
+  width: 92%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  padding: 1px;
+  padding: 20px 1px 4px 1px;
+  position: relative;
+  z-index: 2;
+  margin: 0 auto;
 }
 
 /* Property name and price */
-.property-name, .space-name {
-  font-size: 0.6rem;
-  line-height: 1;
-  margin: 1px 0;
+.property-name {
+  font-size: 0.45rem;
+  line-height: 1.05;
+  margin: 2px 0 0 0;
+  padding: 0 1px;
   text-align: center;
-  width: 100%;
-  word-wrap: break-word;
+  width: 96%;
+  font-weight: 600;
+  color: #333;
+  white-space: normal;
+  word-break: keep-all;
+  hyphens: none;
+  letter-spacing: -0.025em;
 }
 
-.property-price, .space-action {
-  font-size: 0.6rem;
-  line-height: 1;
-  margin: 1px 0;
+.property-price {
+  font-size: 0.45rem;
+  line-height: 1.05;
+  margin-top: 2px;
+  margin-bottom: 2px;
   text-align: center;
-  width: 100%;
+  width: 96%;
+  font-weight: 600;
+  color: #444;
 }
 
 /* Corner colors */
@@ -231,7 +251,7 @@
 
 /* Property colors */
 .brown { background-color: #955436; }
-.light-blue { background-color: #AAE0FA; }
+.lightblue { background-color: #AAE0FA; }
 .pink { background-color: #D93A96; }
 .orange { background-color: #F7941D; }
 .red { background-color: #ED1B24; }

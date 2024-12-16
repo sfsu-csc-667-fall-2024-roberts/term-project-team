@@ -13,7 +13,7 @@
         <p class="section-description">Customize your game settings</p>
       </div>
 
-      <form action="/games" method="POST" class="create-game-form">
+      <form action="/lobby/create" method="POST" class="create-game-form">
         <div class="form-group">
           <label for="bot-count">Number of Bot Players</label>
           <select name="botCount" id="bot-count" class="form-control">
@@ -97,7 +97,7 @@
       <div class="games-list">
         <% if (games && games.length > 0) { %>
           <% games.forEach(game => { %>
-            <div class="game-card <%= game.status === 'waiting' && game.total_players < 4 ? 'joinable' : '' %>">
+            <div class="game-card <%= game.status === 'waiting' && game.playerCount < 4 ? 'joinable' : '' %>">
               <div class="game-info">
                 <div class="game-header">
                   <h3>Game #<%= game.id %></h3>
@@ -109,33 +109,33 @@
                   <div class="player-count">
                     <span class="detail-icon">👥</span>
                     <span class="detail-text">
-                      <%= game.human_count %> human<%= game.human_count !== 1 ? 's' : '' %>, 
-                      <%= game.bot_count %> bot<%= game.bot_count !== 1 ? 's' : '' %>
+                      <%= game.humanCount || 0 %> human<%= (game.humanCount || 0) !== 1 ? 's' : '' %>, 
+                      <%= game.botCount || 0 %> bot<%= (game.botCount || 0) !== 1 ? 's' : '' %>
                     </span>
                   </div>
                   <div class="total-players">
                     <span class="detail-icon">🎲</span>
-                    <span class="detail-text"><%= game.total_players %>/4 players</span>
+                    <span class="detail-text"><%= game.playerCount || 0 %>/4 players</span>
                   </div>
                 </div>
                 <div class="game-actions">
-                  <% if (game.status === 'waiting' && game.total_players < 4) { %>
-                    <form action="/games/<%= game.id %>/join" method="POST" class="join-form">
+                  <% if (game.status === 'waiting' && game.playerCount < 4) { %>
+                    <form action="/lobby/join/<%= game.id %>" method="POST" class="join-form">
                       <button type="submit" class="btn btn-secondary join-game-btn">
                         <span class="btn-icon">➡️</span>
                         Join Game
                       </button>
                     </form>
                   <% } %>
-                  <% if (game.owner_id === user.id) { %>
-                    <form action="/games/<%= game.id %>/delete" method="POST" class="delete-form">
+                  <% if (game.ownerId === user.id) { %>
+                    <form action="/lobby/delete/<%= game.id %>" method="POST" class="delete-form">
                       <button type="submit" class="btn btn-danger delete-game-btn">
                         <span class="btn-icon">🗑️</span>
                         Delete Game
                       </button>
                     </form>
                   <% } else if (game.status === 'waiting') { %>
-                    <form action="/games/<%= game.id %>/leave" method="POST" class="leave-form">
+                    <form action="/lobby/leave/<%= game.id %>" method="POST" class="leave-form">
                       <button type="submit" class="btn btn-outline leave-game-btn">
                         <span class="btn-icon">🚪</span>
                         Leave Game

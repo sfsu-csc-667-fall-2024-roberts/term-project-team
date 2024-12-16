@@ -145,7 +145,16 @@ initializeLiveReload().catch(error => {
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(express.static(path.join(process.cwd(), 'public')));
+
+// Add Content Security Policy headers
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:35729 https://localhost:35729; connect-src 'self' ws://localhost:35729 wss://localhost:35729; style-src 'self' 'unsafe-inline';"
+  );
+  next();
+});
 
 // Add user data to locals
 app.use(addUserToLocals);
@@ -166,8 +175,8 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use(authRoutes);
-app.use('/game', gameRoutes);
-app.use(lobbyRoutes);
+app.use('/games', gameRoutes);
+app.use('/lobby', lobbyRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

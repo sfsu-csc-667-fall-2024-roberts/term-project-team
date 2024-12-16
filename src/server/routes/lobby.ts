@@ -1,254 +1,347 @@
-import express from 'express';
+import express, { Request, Response, Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { pool } from '../db/config';
-import { createGame, getGames, joinGame, createBotPlayer, getUserById, deleteGame, leaveGame } from '../db/services/dbService';
-import session from 'express-session';
-import { PoolClient } from 'pg';
+import { GameState, Player } from '../../shared/types';
+import { BOARD_SPACES } from '../../shared/boardData';
 
-type TypedSession = session.Session & {
-  userId?: number;
-  username?: string;
-  returnTo?: string;
-};
+const router: Router = express.Router();
 
-const router = express.Router();
-
-// GET /lobby - Show game lobby
-router.get('/lobby', requireAuth, async (req, res) => {
-  try {
-    console.log('Loading lobby view...');
-    const games = await getGames();
-    console.log('Available games:', games.map(g => ({ id: g.id, status: g.status, owner: g.owner_id })));
-    res.render('lobby', { 
-      games,
-      error: req.query.error,
-      success: req.query.success
-    });
-  } catch (error) {
-    console.error('Lobby view error:', error);
-    res.redirect('/?error=lobby-error');
+// Initialize game properties
+async function initializeGameProperties(client: any, gameId: number): Promise<void> {
+  console.log('=== Initializing Game Properties ===');
+  
+  for (const space of BOARD_SPACES) {
+    if (space.type === 'property' || space.type === 'railroad' || space.type === 'utility') {
+      await client.query(
+        `INSERT INTO properties (
+          game_id,
+          position,
+          name,
+          type,
+          price,
+          rent_levels,
+          house_cost,
+          hotel_cost,
+          mortgage_value,
+          color_group,
+          owner_id,
+          is_mortgaged,
+          house_count,
+          has_hotel
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+        [
+          gameId,
+          space.position,
+          space.name,
+          space.type,
+          space.price || 0,
+          space.rentLevels || [],
+          space.houseCost || 0,
+          space.hotelCost || 0,
+          space.mortgageValue || 0,
+          space.colorGroup || null,
+          null,
+          false,
+          0,
+          false
+        ]
+      );
+    }
   }
-});
+  
+  console.log('Properties initialized successfully');
+}
 
-// POST /games - Create a new game
-router.post('/games', requireAuth, async (req, res) => {
+// Create a new game
+async function createGame(ownerId: number): Promise<number> {
   const client = await pool.connect();
+  console.log('=== Creating New Game ===');
+  console.log('Owner ID:', ownerId);
+  
   try {
-    console.log('\n=== Creating New Game ===');
     await client.query('BEGIN');
     
-    const typedSession = req.session as TypedSession;
-    const userId = typedSession.userId;
+    const initialGameState = {
+      phase: 'waiting',
+      currentPlayerIndex: 0,
+      diceRolls: [],
+      turnOrder: [],
+      players: [],
+      properties: [],
+      doublesCount: 0,
+      jailTurns: {},
+      bankruptPlayers: [],
+      jailFreeCards: {},
+      turnCount: 0,
+      freeParkingPot: 0
+    };
     
-    console.log('Session details:', {
-      sessionId: req.sessionID,
-      userId,
-      username: typedSession.username,
-      session: typedSession
-    });
-
-    if (!userId) {
-      console.error('No user ID in session');
-      throw new Error('Not authenticated');
-    }
-
-    // First verify user exists in database
-    const userCheck = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
-    console.log('User check query:', {
-      query: 'SELECT * FROM users WHERE id = $1',
-      params: [userId]
-    });
-    console.log('User check result:', {
-      userId,
-      found: userCheck.rows.length > 0,
-      userData: userCheck.rows[0],
-      rowCount: userCheck.rowCount
-    });
-
-    if (!userCheck.rows[0]) {
-      // Additional check - list all users in database
-      const allUsers = await client.query('SELECT id, username FROM users');
-      console.error('User not found in database. All users:', allUsers.rows);
-      
-      // Check if session is stale
-      if (typedSession.username) {
-        const userByUsername = await client.query('SELECT * FROM users WHERE username = $1', [typedSession.username]);
-        if (userByUsername.rows[0]) {
-          console.log('Found user by username, updating session userId');
-          typedSession.userId = userByUsername.rows[0].id;
-          await new Promise<void>((resolve, reject) => {
-            req.session.save((err) => {
-              if (err) reject(err);
-              else resolve();
-            });
-          });
-          // Retry with corrected userId
-          return res.redirect(307, '/games');
-        }
-      }
-      
-      throw new Error(`User ${userId} not found in database`);
-    }
-
-    const botCount = parseInt(req.body.botCount) || 0;
-    const botDifficulty = req.body.botDifficulty || 'medium';
-    const botStrategy = req.body.botStrategy || 'balanced';
-
-    console.log('Game configuration:', {
-      botCount,
-      botDifficulty,
-      botStrategy
-    });
-
-    // Get user info using transaction client
-    const userResult = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
-    const user = userResult.rows[0];
-    if (!user) {
-      throw new Error(`User ${userId} not found in transaction context`);
-    }
-    console.log('Creating game for user:', { userId: user.id, username: user.username });
-
-    // Create the game using the transaction client
-    const game = await createGame(userId, client as PoolClient);
-    console.log('Game created:', { gameId: game.id, ownerId: game.owner_id });
+    console.log('Initial game state:', initialGameState);
     
-    // Add bot players if requested
-    if (botCount > 0) {
-      console.log(`Adding ${botCount} bots to game ${game.id}`);
-      for (let i = 0; i < botCount; i++) {
-        const bot = await createBotPlayer(game.id, botStrategy, botDifficulty, client as PoolClient);
-        console.log(`Bot ${i + 1} created:`, bot);
-      }
-    }
-
+    const result = await client.query(
+      'INSERT INTO games (owner_id, status, game_state) VALUES ($1, $2, $3) RETURNING id',
+      [ownerId, 'waiting', initialGameState]
+    );
+    
+    const gameId = result.rows[0].id;
+    console.log('Game created:', result.rows[0]);
+    
+    // Initialize properties for the game
+    await initializeGameProperties(client, gameId);
+    
     await client.query('COMMIT');
-    console.log('Transaction committed successfully');
-    console.log(`Redirecting to game ${game.id}`);
-    res.redirect(`/game/${game.id}`);
+    return gameId;
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Game creation error:', error);
-    // Add more detailed error information to the redirect
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    res.redirect(`/lobby?error=failed-to-create-game&details=${encodeURIComponent(errorMessage)}`);
+    console.error('Error creating game:', error);
+    throw error;
   } finally {
     client.release();
-    console.log('=== Game Creation Complete ===\n');
+  }
+}
+
+// Get all available games
+async function getGames(): Promise<any[]> {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        g.*,
+        COUNT(p.id) as player_count,
+        COUNT(CASE WHEN p.is_bot = false THEN 1 END) as human_count,
+        COUNT(CASE WHEN p.is_bot = true THEN 1 END) as bot_count
+      FROM games g 
+      LEFT JOIN players p ON g.id = p.game_id 
+      WHERE g.status = $1 
+      GROUP BY g.id
+    `, ['waiting']);
+    return result.rows;
+  } catch (error) {
+    console.error('Error getting games:', error);
+    return [];
+  }
+}
+
+// Join a game
+async function joinGame(gameId: number, userId: number, username: string): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Check if player is already in game
+    const existingPlayer = await client.query(
+      'SELECT * FROM players WHERE game_id = $1 AND user_id = $2',
+      [gameId, userId]
+    );
+    
+    if (existingPlayer.rows.length > 0) {
+      return true;
+    }
+    
+    // Add player to game
+    await client.query(
+      'INSERT INTO players (game_id, user_id, username, position, money, is_bot) VALUES ($1, $2, $3, $4, $5, $6)',
+      [gameId, userId, username, 0, 1500, false]
+    );
+    
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error joining game:', error);
+    return false;
+  } finally {
+    client.release();
+  }
+}
+
+// Create a bot player
+async function createBotPlayer(gameId: number, botName: string, strategy: string = 'default', difficulty: string = 'medium'): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    await client.query(
+      'INSERT INTO players (game_id, username, position, money, is_bot, bot_strategy, bot_difficulty) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [gameId, botName, 0, 1500, true, strategy, difficulty]
+    );
+    
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creating bot player:', error);
+    return false;
+  } finally {
+    client.release();
+  }
+}
+
+// Get user by ID
+async function getUserById(userId: number): Promise<any> {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE id = $1',
+      [userId]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error getting user:', error);
+    return null;
+  }
+}
+
+// Delete a game
+async function deleteGame(gameId: number, userId: number): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Check if user owns the game
+    const game = await client.query(
+      'SELECT * FROM games WHERE id = $1 AND owner_id = $2',
+      [gameId, userId]
+    );
+    
+    if (game.rows.length === 0) {
+      return false;
+    }
+    
+    // Delete game and all related data
+    await client.query('DELETE FROM players WHERE game_id = $1', [gameId]);
+    await client.query('DELETE FROM properties WHERE game_id = $1', [gameId]);
+    await client.query('DELETE FROM games WHERE id = $1', [gameId]);
+    
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting game:', error);
+    return false;
+  } finally {
+    client.release();
+  }
+}
+
+// Leave a game
+async function leaveGame(gameId: number, userId: number): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    await client.query(
+      'DELETE FROM players WHERE game_id = $1 AND user_id = $2',
+      [gameId, userId]
+    );
+    
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error leaving game:', error);
+    return false;
+  } finally {
+    client.release();
+  }
+}
+
+// Routes
+router.get('/', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const games = await getGames();
+    const typedSession = req.session as any;
+    res.render('lobby', { 
+      games,
+      user: {
+        id: typedSession.userId,
+        username: typedSession.username
+      }
+    });
+  } catch (error) {
+    console.error('Error rendering lobby:', error);
+    res.status(500).send('Server error');
   }
 });
 
-// POST /games/:id/join - Join an existing game
-router.post('/games/:id/join', requireAuth, async (req, res) => {
+router.post('/create', requireAuth, async (req: Request, res: Response) => {
+  console.log('=== Create Game Route ===');
   try {
-    console.log('\n=== Joining Game ===');
-    const gameId = parseInt(req.params.id);
-    console.log('Attempting to join game:', { gameId, rawId: req.params.id });
-
-    if (isNaN(gameId)) {
-      console.error('Invalid game ID:', req.params.id);
-      return res.redirect('/lobby?error=invalid-game');
-    }
-
-    const typedSession = req.session as TypedSession;
-    const userId = typedSession.userId;
+    const typedSession = req.session as any;
+    console.log('User session:', typedSession);
     
-    console.log('Session details:', {
-      userId,
-      session: typedSession
-    });
-
-    if (!userId) {
-      throw new Error('Not authenticated');
-    }
+    const gameId = await createGame(typedSession.userId);
+    console.log('Game created with ID:', gameId);
     
-    // Verify user exists
-    const user = await getUserById(userId);
-    if (!user) {
-      console.error('User not found:', userId);
-      req.session.destroy(() => {});
-      return res.redirect('/login?error=invalid-user');
-    }
-    console.log('User verified:', { userId: user.id, username: user.username });
-
-    await joinGame(gameId, userId);
-    console.log('Successfully joined game');
-    console.log(`Redirecting to game ${gameId}`);
-    res.redirect(`/game/${gameId}`);
+    const joinResult = await joinGame(gameId, typedSession.userId, typedSession.username);
+    console.log('Join game result:', joinResult);
+    
+    res.redirect(`/games/${gameId}`);
   } catch (error) {
-    console.error('Game join error:', error);
-    res.redirect('/lobby?error=join-failed');
-  } finally {
-    console.log('=== Join Game Complete ===\n');
+    console.error('Error in create game route:', error);
+    res.status(500).send('Server error');
   }
 });
 
-// POST /games/:id/delete - Delete a game (owner only)
-router.post('/games/:id/delete', requireAuth, async (req, res) => {
+router.post('/join/:id', requireAuth, async (req: Request, res: Response) => {
   try {
-    console.log('\n=== Deleting Game ===');
     const gameId = parseInt(req.params.id);
-    console.log('Attempting to delete game:', { gameId, rawId: req.params.id });
-
-    if (isNaN(gameId)) {
-      console.error('Invalid game ID:', req.params.id);
-      return res.redirect('/lobby?error=invalid-game');
+    const typedSession = req.session as any;
+    const success = await joinGame(gameId, typedSession.userId, typedSession.username);
+    if (success) {
+      res.redirect(`/games/${gameId}`);
+    } else {
+      res.redirect('/lobby?error=join-failed');
     }
-
-    const typedSession = req.session as TypedSession;
-    const userId = typedSession.userId;
-    
-    console.log('Session details:', {
-      userId,
-      session: typedSession
-    });
-
-    if (!userId) {
-      throw new Error('Not authenticated');
-    }
-
-    await deleteGame(gameId, userId);
-    console.log('Game successfully deleted');
-    res.redirect('/lobby?success=game-deleted');
   } catch (error) {
-    console.error('Game deletion error:', error);
-    res.redirect('/lobby?error=delete-failed');
-  } finally {
-    console.log('=== Delete Game Complete ===\n');
+    console.error('Error joining game:', error);
+    res.status(500).send('Server error');
   }
 });
 
-// POST /games/:id/leave - Leave a game
-router.post('/games/:id/leave', requireAuth, async (req, res) => {
+router.post('/leave/:id', requireAuth, async (req: Request, res: Response) => {
   try {
-    console.log('\n=== Leaving Game ===');
     const gameId = parseInt(req.params.id);
-    console.log('Attempting to leave game:', { gameId, rawId: req.params.id });
-
-    if (isNaN(gameId)) {
-      console.error('Invalid game ID:', req.params.id);
-      return res.redirect('/lobby?error=invalid-game');
+    const typedSession = req.session as any;
+    const success = await leaveGame(gameId, typedSession.userId);
+    if (success) {
+      res.redirect('/lobby');
+    } else {
+      res.status(400).send('Failed to leave game');
     }
-
-    const typedSession = req.session as TypedSession;
-    const userId = typedSession.userId;
-    
-    console.log('Session details:', {
-      userId,
-      session: typedSession
-    });
-
-    if (!userId) {
-      throw new Error('Not authenticated');
-    }
-
-    await leaveGame(gameId, userId);
-    console.log('Successfully left game');
-    res.redirect('/lobby?success=game-left');
   } catch (error) {
-    console.error('Game leave error:', error);
-    res.redirect('/lobby?error=leave-failed');
-  } finally {
-    console.log('=== Leave Game Complete ===\n');
+    console.error('Error leaving game:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+router.post('/delete/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const gameId = parseInt(req.params.id);
+    const typedSession = req.session as any;
+    const success = await deleteGame(gameId, typedSession.userId);
+    if (success) {
+      res.redirect('/lobby');
+    } else {
+      res.status(400).send('Failed to delete game');
+    }
+  } catch (error) {
+    console.error('Error deleting game:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+router.post('/add-bot/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const gameId = parseInt(req.params.id);
+    const { botName, strategy, difficulty } = req.body;
+    const success = await createBotPlayer(gameId, botName, strategy, difficulty);
+    if (success) {
+      res.redirect(`/games/${gameId}`);
+    } else {
+      res.status(400).send('Failed to add bot');
+    }
+  } catch (error) {
+    console.error('Error adding bot:', error);
+    res.status(500).send('Server error');
   }
 });
 

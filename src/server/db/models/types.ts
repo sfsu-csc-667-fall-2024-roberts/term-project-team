@@ -4,8 +4,8 @@ export interface User {
   id: number;
   username: string;
   hashed_password: string;
-  created_at: Date;
-  updated_at: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export { Player, Property, GameState, Game }; 

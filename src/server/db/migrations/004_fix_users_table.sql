@@ -1,41 +1,53 @@
--- Drop existing tables and their dependencies
-DROP TABLE IF EXISTS players CASCADE;
-DROP TABLE IF EXISTS games CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
+-- Add new columns and modify existing ones without recreating tables
+DO $$
+BEGIN
+    -- Add new columns to players table
+    ALTER TABLE players
+        ADD COLUMN IF NOT EXISTS isBot BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS isBankrupt BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS inJail BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS jailTurns INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS turnOrder INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS botStrategy VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS botDifficulty VARCHAR(50);
 
--- Recreate users table with correct structure
-CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  username VARCHAR(255) UNIQUE NOT NULL,
-  hashed_password VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+    -- Add gameState to games table
+    ALTER TABLE games
+        ADD COLUMN IF NOT EXISTS gameState JSONB DEFAULT '{"phase": "waiting", "currentPlayerIndex": 0, "diceRolls": [], "turnOrder": []}'::jsonb;
 
--- Recreate games table
-CREATE TABLE games (
-  id SERIAL PRIMARY KEY,
-  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  status VARCHAR(50) NOT NULL DEFAULT 'waiting',
-  game_state JSONB DEFAULT '{"phase": "waiting", "current_player_index": 0, "dice_rolls": [], "turn_order": []}'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  CHECK (status IN ('waiting', 'in-progress', 'finished'))
-);
+    -- Rename columns from snake_case to camelCase
+    -- Users table
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'created_at') THEN
+        ALTER TABLE users RENAME COLUMN created_at TO createdAt;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'updated_at') THEN
+        ALTER TABLE users RENAME COLUMN updated_at TO updatedAt;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'password_hash') THEN
+        ALTER TABLE users RENAME COLUMN password_hash TO passwordHash;
+    END IF;
 
--- Recreate players table with bot support and username
-CREATE TABLE players (
-  id SERIAL PRIMARY KEY,
-  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  username VARCHAR(255) NOT NULL,
-  balance INTEGER NOT NULL DEFAULT 1500,
-  position INTEGER NOT NULL DEFAULT 0,
-  jailed BOOLEAN NOT NULL DEFAULT FALSE,
-  is_bot BOOLEAN NOT NULL DEFAULT FALSE,
-  bot_strategy VARCHAR(50) CHECK (bot_strategy IN ('aggressive', 'conservative', 'balanced') OR bot_strategy IS NULL),
-  bot_difficulty VARCHAR(20) CHECK (bot_difficulty IN ('easy', 'medium', 'hard') OR bot_difficulty IS NULL),
-  turn_order INTEGER,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-); 
+    -- Games table
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'games' AND column_name = 'created_at') THEN
+        ALTER TABLE games RENAME COLUMN created_at TO createdAt;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'games' AND column_name = 'updated_at') THEN
+        ALTER TABLE games RENAME COLUMN updated_at TO updatedAt;
+    END IF;
+
+    -- Players table
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'players' AND column_name = 'created_at') THEN
+        ALTER TABLE players RENAME COLUMN created_at TO createdAt;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'players' AND column_name = 'updated_at') THEN
+        ALTER TABLE players RENAME COLUMN updated_at TO updatedAt;
+    END IF;
+
+    -- Properties table
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'properties' AND column_name = 'created_at') THEN
+        ALTER TABLE properties RENAME COLUMN created_at TO createdAt;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'properties' AND column_name = 'updated_at') THEN
+        ALTER TABLE properties RENAME COLUMN updated_at TO updatedAt;
+    END IF;
+END $$; 

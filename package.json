@@ -20,7 +20,9 @@
     "logs:clear": "clear",
     "dev:clean": "npm run cleanup:livereload && npm run logs:clear && npm run dev:start",
     "db:fresh": "npm run db:reset && npm run migrate",
-    "dev:fresh": "npm run db:fresh && npm run dev:clean"
+    "dev:fresh": "npm run db:fresh && npm run dev:clean",
+    "db:test": "npm run db:fresh && npm run test:data",
+    "dev:test": "npm run db:test && npm run dev:clean"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

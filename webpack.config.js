@@ -7,6 +7,7 @@ module.exports = {
     game: './src/public/js/game.ts',
     lobby: './src/public/js/lobby.ts',
     chat: './src/public/js/chat.ts',
+    main: './src/public/js/main.ts',
     styles: [
       './src/public/css/main.css',
       './src/public/css/auth.css',

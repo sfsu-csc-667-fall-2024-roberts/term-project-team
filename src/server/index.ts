@@ -14,10 +14,13 @@ import chatRoutes from './routes/chat';
 import { addUserToLocals } from './middleware';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as configuration from "./config";
+import { createServer } from "http";
 
 const execAsync = promisify(exec);
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // Kill existing LiveReload processes
@@ -89,7 +92,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 // Session configuration
-app.use(session({
+/*app.use(session({
   secret: process.env.JWT_SECRET || 'your_secret_key',
   resave: false,
   saveUninitialized: false,
@@ -101,7 +104,13 @@ app.use(session({
   },
   name: 'monopoly.sid', // Custom session cookie name
   rolling: true // Refresh session with each request
-}));
+}));*/
+
+configuration.configureSocketIO(
+  server,
+  app,
+  configuration.configureSession(app)!,
+);
 
 // Add user data to locals
 app.use(addUserToLocals);

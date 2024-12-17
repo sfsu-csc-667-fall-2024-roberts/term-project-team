@@ -9,6 +9,7 @@ import { pool } from './db/config';
 import authRoutes from './routes/auth';
 import gameRoutes from './routes/game';
 import lobbyRoutes from './routes/lobby';
+import testRoutes from './routes/tests';
 import { addUserToLocals } from './middleware';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -122,6 +123,9 @@ app.get('/', (req, res) => {
 app.use(authRoutes);
 app.use('/game', gameRoutes);
 app.use(lobbyRoutes);
+
+//Test route
+app.use('/test', testRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

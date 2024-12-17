@@ -1,0 +1,26 @@
+<template id="chat-message-template">
+    <li class="chat-message flex flex-row items-center">
+      <img class="gravatar w-[16px] h-[16px] rounded-[8px] mr-[4px] self-start" />
+      <span class="content text-[8px] text-gray-700"></span>
+    </li>
+  </template>
+
+  <!--Some chat code copied/modified from jrob's repo; see recording Dec. 9, 06:41-->
+  
+  <aside id="chat-section" class="h-[300px] flex flex-col">
+    <ul
+      id="messages"
+      class="rounded-md border-[1px] border-gray-300 w-full grow p-[4px] overflow-y-auto"
+    ></ul>
+    <form method="post" class="flex flex-row h-[20px] mt-[8px]">
+      <input
+        id="chat-message"
+        autocomplete="off"
+        placeholder="Type your message here"
+        class="border-[1px] border-gray-300 mr-[4px] block grow rounded-sm text-[10px] px-1"
+      /><button class="w-[30px] text-[8px] bg-blue-200 rounded-sm px-1">
+        Send
+      </button>
+    </form>
+  </aside>
+  <script src="/dist/chat.bundle.js"></script>

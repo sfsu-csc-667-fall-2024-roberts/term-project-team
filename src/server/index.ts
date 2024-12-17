@@ -10,6 +10,7 @@ import authRoutes from './routes/auth';
 import gameRoutes from './routes/game';
 import lobbyRoutes from './routes/lobby';
 import testRoutes from './routes/tests';
+import chatRoutes from './routes/chat';
 import { addUserToLocals } from './middleware';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -126,6 +127,8 @@ app.use(lobbyRoutes);
 
 //Test route
 app.use('/test', testRoutes);
+
+app.use('/chat', chatRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

@@ -106,14 +106,24 @@ class GameService {
       console.log('Players query result:', result.rows);
       // Convert snake_case to camelCase for consistency
       const players = result.rows.map(player => ({
-        ...player,
+        id: player.id,
+        gameId: player.game_id,
         userId: player.user_id,
+        username: player.username,
+        position: player.position || 0,
+        money: player.money || 1500,
+        balance: player.money || 1500,
         isBot: player.is_bot,
-        inJail: player.in_jail,
-        jailTurns: player.jail_turns,
-        isBankrupt: player.is_bankrupt,
-        turnOrder: player.turn_order
+        botStrategy: player.bot_strategy,
+        botDifficulty: player.bot_difficulty,
+        inJail: player.injail || false,
+        jailTurns: player.jailturns || 0,
+        isBankrupt: player.isbankrupt || false,
+        turnOrder: player.turnorder || 0,
+        createdAt: player.createdat,
+        updatedAt: player.updatedat
       }));
+      
       console.log('Converted players:', players);
       return players;
     } catch (error) {

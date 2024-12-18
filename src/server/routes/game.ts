@@ -199,11 +199,31 @@ router.get('/:gameId/state', requireAuth, async (req: Request<{ gameId: string }
     const properties = await gameService.getGameProperties(gameId);
     const typedSession = req.session as any;
 
+    // Get current player from game state or find in players
+    const currentPlayer = players.find(p => p.userId === typedSession.userId);
+    const currentPlayerId = currentPlayer?.id || -1;
+
     const gameData: GameData = {
       gameId,
       currentUserId: typedSession.userId || null,
-      currentPlayerId: game.game_state.currentPlayerId || null,
-      gameState: game.game_state,
+      currentPlayerId: currentPlayerId,
+      gameState: game.game_state || {
+        id: gameId,
+        phase: 'waiting',
+        currentPlayerId: currentPlayerId,
+        currentPlayerIndex: 0,
+        players: players,
+        properties: properties,
+        diceRolls: [],
+        turnOrder: [],
+        doublesCount: 0,
+        jailTurns: {},
+        bankruptPlayers: [],
+        jailFreeCards: {},
+        turnCount: 0,
+        freeParkingPot: 0,
+        gameLog: []
+      },
       players,
       properties
     };

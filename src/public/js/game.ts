@@ -730,16 +730,26 @@ export class GameService {
             });
 
             // Update player position with animation
-            console.log('Updating player position:', {
-                playerId: currentPlayer.id,
-                newPosition
-            });
-            
-            const playerIndex = this.gameData.players.findIndex(p => p.id === currentPlayer.id);
-            await this.board.updatePlayerPosition(currentPlayer.id, newPosition, playerIndex);
-
-            // Wait for animation to complete
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            if (typeof newPosition === 'number' && currentPlayer) {
+                console.log('Updating player position:', {
+                    playerId: currentPlayer.id,
+                    fromPosition: currentPlayer.position,
+                    toPosition: newPosition
+                });
+                
+                const playerIndex = this.gameData.players.findIndex(p => p.id === currentPlayer.id);
+                
+                // First update the data
+                currentPlayer.position = newPosition;
+                
+                // Then update the visual position
+                if (this.board) {
+                    await this.board.updatePlayerPosition(currentPlayer.id, newPosition, playerIndex);
+                    
+                    // Wait for animation to complete
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
 
             // Process space action if any
             if (spaceAction) {
@@ -1176,18 +1186,21 @@ export class GameService {
         if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
             const rollCount = this.gameData.gameState.diceRolls.length;
             const totalPlayers = this.gameData.players.length;
+            const playersWhoHaveNotRolled = this.gameData.players.filter(p => 
+                !this.gameData.gameState.diceRolls.some(r => r.id === p.id)
+            );
+            const nextToRoll = playersWhoHaveNotRolled[0];
             
             if (rollCount === 0) {
-                statusText = 'Rolling for turn order - All players need to roll';
-            } else if (rollCount < totalPlayers) {
-                const remainingCount = totalPlayers - rollCount;
-                statusText = `Rolling for turn order - Waiting for ${remainingCount} player${remainingCount > 1 ? 's' : ''} to roll`;
+                statusText = 'Initial Roll Phase - All players need to roll';
+            } else if (nextToRoll) {
+                statusText = `Initial Roll Phase - Waiting for ${nextToRoll.username}${nextToRoll.isBot ? ' 🤖' : ''} to roll (${rollCount}/${totalPlayers} players rolled)`;
             } else {
-                statusText = 'Determining turn order...';
+                statusText = 'Initial Roll Phase - All players have rolled';
             }
         } else {
             statusText = currentPlayer ? 
-                `${currentPlayer.username}'s Turn${currentPlayer.id === this.gameData.currentPlayerId ? ' - Your turn!' : ''}` :
+                `${currentPlayer.username}${currentPlayer.isBot ? ' 🤖' : ''}'s Turn${currentPlayer.id === this.gameData.currentPlayerId ? ' - Your turn!' : ''}` :
                 'Waiting for next turn...';
         }
 

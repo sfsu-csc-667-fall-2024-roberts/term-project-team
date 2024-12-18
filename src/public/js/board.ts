@@ -1,6 +1,5 @@
-import { ExtendedBoardSpace } from '../../shared/types';
+import { ExtendedBoardSpace, Player, Property } from '../../shared/types';
 import { BOARD_SPACES } from '../../shared/boardData';
-import { Property } from './types';
 
 export default class MonopolyBoard {
   private container!: HTMLElement;
@@ -94,6 +93,26 @@ export default class MonopolyBoard {
     centerArea.className = 'board-center';
     centerArea.innerHTML = '<div class="board-center-monopoly">MONOPOLY</div>';
     boardWrapper.appendChild(centerArea);
+
+    // Place player tokens
+    if (window.monopolyGameData && window.monopolyGameData.players) {
+      window.monopolyGameData.players.forEach((player: Player, index: number) => {
+        this.updatePlayerPosition(player.id, player.position || 0, index);
+      });
+
+      // Update property ownership
+      if (window.monopolyGameData.properties) {
+        window.monopolyGameData.properties.forEach((property: Property) => {
+          if (property.ownerId) {
+            const ownerIndex = window.monopolyGameData.players.findIndex((p: Player) => p.id === property.ownerId);
+            if (ownerIndex !== -1) {
+              this.updatePropertyOwnership(property, ownerIndex);
+            }
+          }
+        });
+      }
+    }
+
     console.log('Board initialization complete');
   }
 
@@ -171,23 +190,88 @@ export default class MonopolyBoard {
 
   public updatePlayerPosition(playerId: number, position: number, playerIndex: number): void {
     console.log(`Updating player ${playerId} to position ${position}`);
+    let token = this.playerTokens.get(playerId);
     
-    // Remove player token from current position
-    const existingToken = this.container.querySelector(`.player-token[data-player-id="${playerId}"]`);
-    if (existingToken) {
-        existingToken.remove();
+    // Create token if it doesn't exist
+    if (!token) {
+      token = document.createElement('div');
+      token.className = 'player-token';
+      token.setAttribute('data-player-id', playerId.toString());
+      token.style.backgroundColor = this.playerColors.base[playerIndex % this.playerColors.base.length];
+      token.style.width = '24px';
+      token.style.height = '24px';
+      token.style.borderRadius = '50%';
+      token.style.position = 'absolute';
+      token.style.zIndex = '100';
+      token.style.transition = 'all 0.5s ease-in-out';
+      token.style.border = '2px solid white';
+      token.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+      this.container.appendChild(token);
+      this.playerTokens.set(playerId, token);
     }
 
-    // Create new token
-    const token = document.createElement('div');
-    token.className = `player-token player-color-${playerIndex}`;
-    token.setAttribute('data-player-id', playerId.toString());
+    // Update token position
+    const space = this.container.querySelector(`[data-position="${position}"]`) as HTMLElement;
+    if (!space) {
+      console.error(`Space not found for position ${position}`);
+      return;
+    }
+
+    const spaceRect = space.getBoundingClientRect();
+    const boardRect = this.container.getBoundingClientRect();
+
+    // Calculate relative position within the board
+    let relativeX = spaceRect.left - boardRect.left + (spaceRect.width / 2) - 12;
+    let relativeY = spaceRect.top - boardRect.top + (spaceRect.height / 2) - 12;
+
+    // Add offset based on player index to prevent overlap
+    const offset = playerIndex * 15;
+    const isCorner = position % 10 === 0;
     
-    // Get space element and add token
-    const space = this.container.querySelector(`.space[data-position="${position}"]`);
-    if (space) {
-        const tokensContainer = space.querySelector('.tokens-container') || this.createTokensContainer(space);
-        tokensContainer.appendChild(token);
+    if (isCorner) {
+      // For corner spaces (including GO), arrange tokens in a grid
+      const row = Math.floor(playerIndex / 2);
+      const col = playerIndex % 2;
+      
+      // Special handling for GO space (position 0)
+      if (position === 0) {
+        relativeX = spaceRect.left - boardRect.left + spaceRect.width - 30 + (col * 25);
+        relativeY = spaceRect.top - boardRect.top + spaceRect.height - 30 + (row * 25);
+      } else {
+        relativeX += (col * 25);
+        relativeY += (row * 25);
+      }
+    } else {
+      // For regular spaces, arrange tokens with offset
+      const side = Math.floor(position / 10); // 0: bottom, 1: left, 2: top, 3: right
+      
+      switch (side) {
+        case 0: // Bottom row
+          relativeX += offset;
+          break;
+        case 1: // Left column
+          relativeY += offset;
+          break;
+        case 2: // Top row
+          relativeX += offset;
+          break;
+        case 3: // Right column
+          relativeY += offset;
+          break;
+      }
+    }
+    
+    // Set token position
+    token.style.left = `${relativeX}px`;
+    token.style.top = `${relativeY}px`;
+
+    // Highlight current player's token
+    if (this.currentPlayerId === playerId) {
+      token.style.transform = 'scale(1.2)';
+      token.style.boxShadow = `0 0 10px ${this.playerColors.highlight[playerIndex % this.playerColors.highlight.length]}`;
+    } else {
+      token.style.transform = 'scale(1)';
+      token.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
     }
   }
 

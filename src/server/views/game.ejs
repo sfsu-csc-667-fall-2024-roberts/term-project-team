@@ -20,10 +20,17 @@
         <div class="game-status-wrapper">
           <div class="game-status" title="Click to view game history">
             <% if (gameState && gameState.phase === 'waiting') { %>
-              Initial Roll Phase - Roll to determine turn order (<%= (gameState.diceRolls || []).length %>/<%= players.length %> players rolled)
+              <% const playersWhoHaveNotRolled = players.filter(p => !gameState.diceRolls.find(r => r.id === p.id)); %>
+              <% const nextToRoll = playersWhoHaveNotRolled[0]; %>
+              <% if (nextToRoll) { %>
+                Initial Roll Phase - Waiting for <%= nextToRoll.username %><%= nextToRoll.isBot ? ' 🤖' : '' %> to roll
+                (<%= (gameState.diceRolls || []).length %>/<%= players.length %> players rolled)
+              <% } else { %>
+                Initial Roll Phase - All players have rolled
+              <% } %>
             <% } else if (gameState && gameState.phase === 'playing') { %>
               <% const currentPlayer = players.find(p => p.id === (gameState.turnOrder || [])[gameState.currentPlayerIndex]); %>
-              <%= currentPlayer ? `${currentPlayer.username}'s Turn` : 'Loading...' %>
+              <%= currentPlayer ? `${currentPlayer.username}${currentPlayer.isBot ? ' 🤖' : ''}'s Turn` : 'Loading...' %>
               <% if (currentPlayer && currentPlayer.id === currentPlayerId) { %>
                 - Your turn!
               <% } %>

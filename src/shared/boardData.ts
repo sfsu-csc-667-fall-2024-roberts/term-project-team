@@ -37,6 +37,7 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     position: 4,
     name: 'Income Tax',
     type: 'tax',
+    price: 200
   },
   {
     position: 5,
@@ -51,6 +52,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 100,
     rentLevels: [6, 30, 90, 270, 400, 550],
+    houseCost: 50,
+    hotelCost: 50,
+    mortgageValue: 50,
     colorGroup: 'lightblue'
   },
   {
@@ -64,6 +68,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 100,
     rentLevels: [6, 30, 90, 270, 400, 550],
+    houseCost: 50,
+    hotelCost: 50,
+    mortgageValue: 50,
     colorGroup: 'lightblue'
   },
   {
@@ -72,6 +79,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 120,
     rentLevels: [8, 40, 100, 300, 450, 600],
+    houseCost: 50,
+    hotelCost: 50,
+    mortgageValue: 60,
     colorGroup: 'lightblue'
   },
   {
@@ -85,6 +95,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 140,
     rentLevels: [10, 50, 150, 450, 625, 750],
+    houseCost: 100,
+    hotelCost: 100,
+    mortgageValue: 70,
     colorGroup: 'pink'
   },
   {
@@ -100,6 +113,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 140,
     rentLevels: [10, 50, 150, 450, 625, 750],
+    houseCost: 100,
+    hotelCost: 100,
+    mortgageValue: 70,
     colorGroup: 'pink'
   },
   {
@@ -108,6 +124,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 160,
     rentLevels: [12, 60, 180, 500, 700, 900],
+    houseCost: 100,
+    hotelCost: 100,
+    mortgageValue: 80,
     colorGroup: 'pink'
   },
   {
@@ -123,6 +142,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 180,
     rentLevels: [14, 70, 200, 550, 750, 950],
+    houseCost: 100,
+    hotelCost: 100,
+    mortgageValue: 90,
     colorGroup: 'orange'
   },
   {
@@ -136,6 +158,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 180,
     rentLevels: [14, 70, 200, 550, 750, 950],
+    houseCost: 100,
+    hotelCost: 100,
+    mortgageValue: 90,
     colorGroup: 'orange'
   },
   {
@@ -144,6 +169,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 200,
     rentLevels: [16, 80, 220, 600, 800, 1000],
+    houseCost: 100,
+    hotelCost: 100,
+    mortgageValue: 100,
     colorGroup: 'orange'
   },
   {
@@ -157,6 +185,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 220,
     rentLevels: [18, 90, 250, 700, 875, 1050],
+    houseCost: 150,
+    hotelCost: 150,
+    mortgageValue: 110,
     colorGroup: 'red'
   },
   {
@@ -170,6 +201,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 220,
     rentLevels: [18, 90, 250, 700, 875, 1050],
+    houseCost: 150,
+    hotelCost: 150,
+    mortgageValue: 110,
     colorGroup: 'red'
   },
   {
@@ -178,6 +212,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 240,
     rentLevels: [20, 100, 300, 750, 925, 1100],
+    houseCost: 150,
+    hotelCost: 150,
+    mortgageValue: 120,
     colorGroup: 'red'
   },
   {
@@ -193,6 +230,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 260,
     rentLevels: [22, 110, 330, 800, 975, 1150],
+    houseCost: 150,
+    hotelCost: 150,
+    mortgageValue: 130,
     colorGroup: 'yellow'
   },
   {
@@ -201,6 +241,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 260,
     rentLevels: [22, 110, 330, 800, 975, 1150],
+    houseCost: 150,
+    hotelCost: 150,
+    mortgageValue: 130,
     colorGroup: 'yellow'
   },
   {
@@ -216,6 +259,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 280,
     rentLevels: [24, 120, 360, 850, 1025, 1200],
+    houseCost: 150,
+    hotelCost: 150,
+    mortgageValue: 140,
     colorGroup: 'yellow'
   },
   {
@@ -229,6 +275,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 300,
     rentLevels: [26, 130, 390, 900, 1100, 1275],
+    houseCost: 200,
+    hotelCost: 200,
+    mortgageValue: 150,
     colorGroup: 'green'
   },
   {
@@ -237,6 +286,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 300,
     rentLevels: [26, 130, 390, 900, 1100, 1275],
+    houseCost: 200,
+    hotelCost: 200,
+    mortgageValue: 150,
     colorGroup: 'green'
   },
   {
@@ -250,6 +302,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 320,
     rentLevels: [28, 150, 450, 1000, 1200, 1400],
+    houseCost: 200,
+    hotelCost: 200,
+    mortgageValue: 160,
     colorGroup: 'green'
   },
   {
@@ -270,12 +325,16 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 350,
     rentLevels: [35, 175, 500, 1100, 1300, 1500],
+    houseCost: 200,
+    hotelCost: 200,
+    mortgageValue: 175,
     colorGroup: 'blue'
   },
   {
     position: 38,
     name: 'Luxury Tax',
     type: 'tax',
+    price: 100
   },
   {
     position: 39,
@@ -283,6 +342,9 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'property',
     price: 400,
     rentLevels: [50, 200, 600, 1400, 1700, 2000],
+    houseCost: 200,
+    hotelCost: 200,
+    mortgageValue: 200,
     colorGroup: 'blue'
   }
 ]; 

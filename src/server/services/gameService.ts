@@ -104,7 +104,18 @@ class GameService {
       );
       
       console.log('Players query result:', result.rows);
-      return result.rows;
+      // Convert snake_case to camelCase for consistency
+      const players = result.rows.map(player => ({
+        ...player,
+        userId: player.user_id,
+        isBot: player.is_bot,
+        inJail: player.in_jail,
+        jailTurns: player.jail_turns,
+        isBankrupt: player.is_bankrupt,
+        turnOrder: player.turn_order
+      }));
+      console.log('Converted players:', players);
+      return players;
     } catch (error) {
       console.error('Error getting game players:', error);
       throw error;
@@ -120,16 +131,20 @@ class GameService {
   }
 
   async updatePlayer(playerId: number, updates: Partial<Player>): Promise<void> {
-    const updateFields = Object.entries(updates)
-      .map(([key, _], index) => {
-        const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        return `${snakeKey} = $${index + 2}`;
-      })
+    // Convert camelCase to snake_case for database
+    const dbUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
+      const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      acc[snakeKey] = value;
+      return acc;
+    }, {} as Record<string, any>);
+
+    const updateFields = Object.entries(dbUpdates)
+      .map(([key, _], index) => `${key} = $${index + 2}`)
       .join(', ');
 
     await this.pool.query(
       `UPDATE players SET ${updateFields} WHERE id = $1`,
-      [playerId, ...Object.values(updates)]
+      [playerId, ...Object.values(dbUpdates)]
     );
   }
 

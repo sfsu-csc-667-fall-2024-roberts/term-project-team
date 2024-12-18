@@ -53,15 +53,15 @@
         <div class="panel-content">
           <div class="players-list">
             <% const sortedPlayers = players.sort((a, b) => { %>
-            <%   if (a.isBot === b.isBot) return 0; %>
-            <%   return a.isBot ? 1 : -1; %>
+            <%   if (a.is_bot === b.is_bot) return 0; %>
+            <%   return a.is_bot ? 1 : -1; %>
             <% }); %>
             
             <% sortedPlayers.forEach((player) => { %>
               <div class="player-card <%= player.id === currentPlayerId ? 'current-player' : '' %>"
                    data-player-id="<%= player.id %>">
                 <div class="player-avatar">
-                  <%= player.isBot ? '🤖' : '👤' %>
+                  <%= player.is_bot ? '🤖' : '👤' %>
                 </div>
                 <div class="player-info">
                   <div class="player-name">
@@ -90,14 +90,14 @@
                       <% } %>
                     </div>
                   </div>
-                  <% if (player.id === currentPlayerId) { %>
+                  <% if (!player.is_bot && player.user_id === currentUserId) { %>
                     <div class="player-controls">
-                      <button id="roll-dice" class="btn btn-primary <%= (gameState.phase === 'waiting' && !gameState.diceRolls.find(r => r.id === currentPlayerId)) || (gameState.phase === 'playing' && gameState.currentPlayerId === currentPlayerId && !gameState.lastRoll) ? 'active' : '' %>"
-                        <%= (gameState.phase === 'waiting' && !gameState.diceRolls.find(r => r.id === currentPlayerId)) || (gameState.phase === 'playing' && gameState.currentPlayerId === currentPlayerId && !gameState.lastRoll) ? '' : 'disabled' %>>
+                      <button id="roll-dice" class="btn btn-primary <%= (gameState.phase === 'waiting' && !gameState.diceRolls.find(r => r.id === player.id)) || (gameState.phase === 'playing' && gameState.currentPlayerId === player.id && !gameState.lastRoll) ? 'active' : '' %>"
+                        <%= (gameState.phase === 'waiting' && !gameState.diceRolls.find(r => r.id === player.id)) || (gameState.phase === 'playing' && gameState.currentPlayerId === player.id && !gameState.lastRoll) ? '' : 'disabled' %>>
                         Roll Dice
                       </button>
-                      <button id="end-turn" class="btn btn-secondary <%= gameState.phase === 'playing' && gameState.currentPlayerId === currentPlayerId && gameState.lastRoll ? 'active' : '' %>"
-                        <%= gameState.phase === 'playing' && gameState.currentPlayerId === currentPlayerId && gameState.lastRoll ? '' : 'disabled' %>>
+                      <button id="end-turn" class="btn btn-secondary <%= gameState.phase === 'playing' && gameState.currentPlayerId === player.id && gameState.lastRoll ? 'active' : '' %>"
+                        <%= gameState.phase === 'playing' && gameState.currentPlayerId === player.id && gameState.lastRoll ? '' : 'disabled' %>>
                         End Turn
                       </button>
                     </div>

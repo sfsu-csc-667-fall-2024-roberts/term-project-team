@@ -90,8 +90,12 @@ router.get('/:gameId', requireAuth, async (req: Request<{ gameId: string }>, res
 
     const typedSession = req.session as any;
     const currentPlayer = players.find(p => p.userId === typedSession.userId);
+    console.log('Looking for player with userId:', typedSession.userId);
+    console.log('Available players:', players.map(p => ({ id: p.id, userId: p.userId, username: p.username })));
+    
     const currentPlayerId = currentPlayer?.id || -1;
     console.log('Current player ID:', currentPlayerId);
+    console.log('Current player:', currentPlayer);
 
     // Initialize default game state with proper structure
     const defaultGameState: GameState = {
@@ -99,7 +103,16 @@ router.get('/:gameId', requireAuth, async (req: Request<{ gameId: string }>, res
       phase: 'waiting',
       currentPlayerId: currentPlayerId,
       currentPlayerIndex: 0,
-      players: players,
+      players: players.map(player => ({
+        ...player,
+        position: player.position || 0,
+        money: player.money || 1500,
+        balance: player.balance || 1500,
+        inJail: player.inJail || false,
+        jailTurns: player.jailTurns || 0,
+        isBankrupt: player.isBankrupt || false,
+        turnOrder: player.turnOrder || 0
+      })),
       properties: properties,
       diceRolls: [],
       turnOrder: [],

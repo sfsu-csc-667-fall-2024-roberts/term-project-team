@@ -61,10 +61,22 @@ async function createGame(ownerId: number): Promise<number> {
   try {
     await client.query('BEGIN');
     
+    // Get owner's username
+    const ownerResult = await client.query(
+      'SELECT username FROM users WHERE id = $1',
+      [ownerId]
+    );
+    
+    if (!ownerResult.rows[0]) {
+      throw new Error('Owner not found');
+    }
+    
+    const ownerUsername = ownerResult.rows[0].username;
+    
     const initialGameState: GameState = {
       id: 0, // Will be updated after game creation
       phase: 'waiting',
-      currentPlayerId: 0, // Will be updated after first player joins
+      currentPlayerId: 0, // Will be updated after player creation
       currentPlayerIndex: 0,
       diceRolls: [],
       turnOrder: [],
@@ -80,16 +92,27 @@ async function createGame(ownerId: number): Promise<number> {
     
     console.log('Initial game state:', initialGameState);
     
-    const result = await client.query(
+    // Create game record
+    const gameResult = await client.query(
       'INSERT INTO games (owner_id, status, game_state) VALUES ($1, $2, $3) RETURNING id',
       [ownerId, 'waiting', initialGameState]
     );
     
-    const gameId = result.rows[0].id;
-    console.log('Game created:', result.rows[0]);
+    const gameId = gameResult.rows[0].id;
+    console.log('Game created:', gameResult.rows[0]);
 
-    // Update the game state with the correct ID
+    // Create player record for owner
+    const playerResult = await client.query(
+      'INSERT INTO players (game_id, user_id, username, position, money, is_bot) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+      [gameId, ownerId, ownerUsername, 0, 1500, false]
+    );
+    
+    const playerId = playerResult.rows[0].id;
+    console.log('Owner player created:', playerResult.rows[0]);
+
+    // Update game state with the correct ID and player
     initialGameState.id = gameId;
+    initialGameState.currentPlayerId = playerId;
     await client.query(
       'UPDATE games SET game_state = $1 WHERE id = $2',
       [initialGameState, gameId]

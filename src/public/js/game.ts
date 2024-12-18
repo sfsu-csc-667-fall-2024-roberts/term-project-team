@@ -113,8 +113,8 @@ export class GameService {
     }
 
     private createDefaultGameState(gameId: number): GameState {
-        // Use -1 as default if currentPlayerId is null
-        const effectiveCurrentPlayerId = this.gameData.currentPlayerId ?? -1;
+        // Use the player's ID if available, otherwise -1
+        const effectiveCurrentPlayerId = this.gameData.players.find(p => p.userId === this.gameData.currentPlayerId)?.id ?? -1;
         
         return {
             id: gameId,
@@ -1228,7 +1228,18 @@ export class GameService {
 
         // During waiting phase, any player who hasn't rolled can roll
         if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
-            return !this.gameData.gameState.diceRolls.some(r => r.id === player.id);
+            // Check if it's the current user's player and they haven't rolled yet
+            const isCurrentUser = !player.isBot && player.id === this.gameData.currentPlayerId;
+            const hasNotRolled = !this.gameData.gameState.diceRolls.some(r => r.id === player.id);
+            console.log('Roll check:', {
+                player: player.username,
+                playerId: player.id,
+                currentPlayerId: this.gameData.currentPlayerId,
+                isBot: player.isBot,
+                isCurrentUser,
+                hasNotRolled
+            });
+            return isCurrentUser && hasNotRolled;
         }
 
         // During playing phase, only current player can roll if they haven't rolled yet
@@ -1322,45 +1333,25 @@ export class GameService {
             
             const balance = document.createElement('div');
             balance.className = 'player-balance';
-            balance.textContent = `$${p.balance}`;
+            balance.textContent = `$${p.money}`;
             
             const position = document.createElement('div');
             position.className = 'player-position';
-            position.textContent = BOARD_SPACES[p.position].name;
+            if (this.gameData.gameState.phase === 'playing') {
+                position.textContent = `Position: ${BOARD_SPACES[p.position]?.name || p.position}`;
+            }
             
             const status = document.createElement('div');
             status.className = 'roll-status';
             
-            // Show jail free card status if any
-            const jailFreeCards = this.gameData.gameState.jailFreeCards?.[p.id] || 0;
-            if (jailFreeCards > 0) {
-                const jailCard = document.createElement('div');
-                jailCard.className = 'jail-free-card';
-                jailCard.textContent = `🎟️ Get Out of Jail Free${jailFreeCards > 1 ? ` (${jailFreeCards})` : ''}`;
-                status.appendChild(jailCard);
-            }
-            
             // Add roll status text based on game phase
             let statusText = '';
-            if (this.gameData.gameState.phase === GAME_PHASES.WAITING) {
-                const allRolls = this.gameData.gameState.diceRolls;
-                const playerRoll = allRolls.find(r => r.id === p.id);
-                
-                if (playerRoll) {
-                    statusText = `Rolled: ${playerRoll.dice ? `${playerRoll.dice[0]} + ${playerRoll.dice[1]} = ${playerRoll.roll}` : playerRoll.roll}`;
-                } else if (allRolls.length === 0 && this.gameData.gameState.lastRoll !== undefined) {
-                    statusText = `Previous: ${this.gameData.gameState.lastRoll} (Tied)`;
-                } else {
-                    statusText = 'Waiting for roll...';
-                }
+            if (this.gameData.gameState.phase === 'waiting') {
+                const playerRoll = this.gameData.gameState.diceRolls.find(r => r.id === p.id);
+                statusText = playerRoll ? `Rolled: ${playerRoll.roll}` : 'Waiting for roll...';
             } else {
-                if (p.id === this.gameData.gameState.turnOrder[this.gameData.gameState.currentPlayerIndex]) {
-                    statusText = this.gameData.gameState.lastRoll ? 
-                        `Current turn (rolled ${this.gameData.gameState.lastRoll})` : 
-                        'Current turn';
-                } else {
-                    statusText = 'Waiting';
-                }
+                statusText = p.id === this.gameData.gameState.turnOrder[this.gameData.gameState.currentPlayerIndex] ? 
+                    'Current turn' : 'Waiting...';
             }
             
             const statusTextEl = document.createElement('div');

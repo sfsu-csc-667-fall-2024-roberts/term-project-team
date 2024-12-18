@@ -6,8 +6,16 @@ import {
   Game,
   RollResponse,
   SpaceAction,
-  RentPaymentResult
+  RentPaymentResult,
+  GamePhase,
+  PlayerWithRoll
 } from '../../shared/types';
+
+interface DiceRoll {
+  id: number;
+  roll: number;
+  dice: [number, number];
+}
 
 class GameService {
   public pool: Pool;
@@ -207,6 +215,45 @@ class GameService {
     const gameState = await this.getGameState(gameId);
     const players = await this.getGamePlayers(gameId);
 
+    // Add roll to diceRolls array
+    if (gameState && gameState.phase === 'waiting') {
+      const newRoll: DiceRoll = { id: playerId, roll, dice };
+      const updatedDiceRolls = [...(gameState.diceRolls || []), newRoll];
+
+      // Sort players by their roll values (highest to lowest)
+      const sortedRolls = [...updatedDiceRolls].sort((a, b) => (b.roll || 0) - (a.roll || 0));
+      const turnOrder = sortedRolls.map(r => r.id);
+
+      if (updatedDiceRolls.length === players.length) {
+        // Update game state to start playing phase
+        const updatedGameState: Partial<GameState> = {
+          phase: 'playing' as GamePhase,
+          diceRolls: updatedDiceRolls as PlayerWithRoll[],
+          turnOrder,
+          currentPlayerIndex: 0,
+          currentPlayerId: turnOrder[0]
+        };
+
+        await this.updateGameState(gameId, updatedGameState);
+        
+        if (gameState) {
+          gameState.phase = 'playing';
+          gameState.diceRolls = updatedDiceRolls as PlayerWithRoll[];
+          gameState.turnOrder = turnOrder;
+          gameState.currentPlayerIndex = 0;
+          gameState.currentPlayerId = turnOrder[0];
+        }
+      } else {
+        // Just update dice rolls if not all players have rolled yet
+        if (gameState) {
+          await this.updateGameState(gameId, {
+            diceRolls: updatedDiceRolls as PlayerWithRoll[]
+          });
+          gameState.diceRolls = updatedDiceRolls as PlayerWithRoll[];
+        }
+      }
+    }
+
     const response: RollResponse = {
       success: true,
       message: `Rolled ${roll} (${dice[0]}, ${dice[1]})`,
@@ -216,12 +263,9 @@ class GameService {
       newPosition,
       spaceAction,
       currentPlayer: updatedPlayer,
-      players
+      players,
+      gameState: gameState || undefined
     };
-
-    if (gameState) {
-      response.gameState = gameState;
-    }
 
     return response;
   }

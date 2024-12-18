@@ -93,15 +93,15 @@ export class GameService {
         console.log('Initializing new board instance');
         this.board = new MonopolyBoard('monopoly-board');
 
-        // Initialize UI components
+        // Initialize message history first
+        this.initializeMessageHistory();
+
+        // Then initialize other UI components
         this.initializeEventListeners();
         this.initializeBoard();
         this.updateGameStatus();
         this.updatePlayersStatus();
         this.updatePropertiesPanel();
-        
-        // Initialize message history
-        this.initializeMessageHistory();
         
         // Set singleton instance
         GameService.instance = this;
@@ -270,14 +270,36 @@ export class GameService {
             });
         }
 
+        // Set up game status click handler
         if (statusElement) {
+            console.log('Setting up game status click handler');
             const newStatus = statusElement.cloneNode(true);
             statusElement.parentNode?.replaceChild(newStatus, statusElement);
+            
+            // Store reference to status element
+            this.statusElement = newStatus as HTMLElement;
+            
+            // Add click handler
             newStatus.addEventListener('click', (e: Event) => {
+                console.log('Game status clicked');
                 e.stopPropagation();
                 this.toggleMessageHistory();
             });
+
+            // Add visual indicator that it's clickable
+            (newStatus as HTMLElement).title = 'Click to view game history';
+            (newStatus as HTMLElement).style.cursor = 'pointer';
         }
+
+        // Add click handler to document to close message history when clicking outside
+        document.addEventListener('click', (e: Event) => {
+            const target = e.target as Node;
+            if (this.messageHistoryPanel && 
+                !this.messageHistoryPanel.contains(target) && 
+                target !== this.statusElement) {
+                this.hideMessageHistory();
+            }
+        });
         
         console.log('Event listeners initialized');
     }
@@ -1815,18 +1837,28 @@ export class GameService {
     }
 
     private toggleMessageHistory(): void {
+        console.log('Toggling message history');
         if (!this.messageHistoryPanel) {
-            console.warn('Message history panel not found');
-            return;
+            console.warn('Message history panel not found, initializing...');
+            this.initializeMessageHistory();
+            if (!this.messageHistoryPanel) {
+                console.error('Failed to initialize message history panel');
+                return;
+            }
         }
         
         const isHidden = this.messageHistoryPanel.classList.contains('hidden');
+        console.log('Message history is currently hidden:', isHidden);
         
         if (isHidden) {
             this.messageHistoryPanel.classList.remove('hidden');
+            this.messageHistoryPanel.style.display = 'flex';
             this.updateMessageHistory();
+            console.log('Showing message history');
         } else {
             this.messageHistoryPanel.classList.add('hidden');
+            this.messageHistoryPanel.style.display = 'none';
+            console.log('Hiding message history');
         }
     }
 

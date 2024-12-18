@@ -360,6 +360,7 @@
   opacity: 0;
   transform: translate(-50%, -45%) scale(0.95);
   pointer-events: none;
+  visibility: hidden;
 }
 
 .message-history-header {

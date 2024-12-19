@@ -9,21 +9,11 @@ const messageTemplate = document.querySelector<HTMLTemplateElement>(
 //Determines socket room number before assigning
 if(window.gameData === undefined) {
   window.roomId = -1;
-  console.log("roomId = " + window.roomId + "(undefined gameId)");
+  console.log("roomId = " + window.roomId + " (undefined gameId, should be in the lobby)");
 } else {
   window.roomId = window.gameData.gameId;
-  console.log("roomId(gameId) = " + window.gameData.gameId);
+  console.log("roomId (gameId) = " + window.gameData.gameId);
 }
-
-//Joins the respective chat room
-/*fetch(`/chat/join/${window.roomId}`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" }
-}).then((response) => {
-  if(response.status !== 200) {
-      console.error("Error:", response);
-  }
-})*/
 
 form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -58,7 +48,7 @@ form.addEventListener("submit", (e) => {
         true,
       ) as HTMLElement;  
       const span = messageElement.querySelector("span")!;
-      span.textContent = message;
+      span.textContent = sender + ": " + message;
   
       if (sender === "system") {
         span.classList.add("text-red-500");

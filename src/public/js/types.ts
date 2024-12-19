@@ -28,7 +28,6 @@ declare global {
   interface Window {
     gameData: GameData;
     socket: Socket;
-    roomId: number;
+    roomId: number; //get from gameData.gameId 
   }
 }
- 

@@ -9,7 +9,7 @@ const bindSession = async (socket: Socket) => {
 
   const {
     user: { id: userId } = {},
-    roomId,
+    //roomId,
     // @ts-expect-error TODO figure out the typing for session on request
   } = request.session;
 
@@ -18,7 +18,7 @@ const bindSession = async (socket: Socket) => {
   socket.join(`chat-${roomId}`);
   socket.join(`game-${roomId}`);*/
 
-  //using a "test" room for now, should be replaced with proper roomId logic later
+  //instead of joining different rooms, we're just emitting commands specific to the room #
   socket.join(`testroom`);
 
   socket.use((_, next) => {
@@ -43,7 +43,7 @@ export default function (
 
     app.set("io", io);
     io.engine.use(sessionMiddleware);
-    
+
     io.on("connection", async (socket) => {
       await bindSession(socket);
 

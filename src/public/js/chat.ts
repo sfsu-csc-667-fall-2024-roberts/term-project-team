@@ -6,6 +6,25 @@ const messageTemplate = document.querySelector<HTMLTemplateElement>(
   "#chat-message-template",
 )!;
 
+//Determines socket room number before assigning
+if(window.gameData === undefined) {
+  window.roomId = -1;
+  console.log("roomId = " + window.roomId + "(undefined gameId)");
+} else {
+  window.roomId = window.gameData.gameId;
+  console.log("roomId(gameId) = " + window.gameData.gameId);
+}
+
+//Joins the respective chat room
+/*fetch(`/chat/join/${window.roomId}`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" }
+}).then((response) => {
+  if(response.status !== 200) {
+      console.error("Error:", response);
+  }
+})*/
+
 form.addEventListener("submit", (e) => {
     e.preventDefault();
   
@@ -13,7 +32,7 @@ form.addEventListener("submit", (e) => {
     input.value = "";
 
     //replace fetch with /chat/${window.roomId} after implementing sockets/sessions/etc
-    fetch(`/chat/test`, {
+    fetch(`/chat/${window.roomId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message })
@@ -26,7 +45,7 @@ form.addEventListener("submit", (e) => {
   });
 
   window.socket.on(
-    `testmessage`,
+    `message:${window.roomId}`,
     ({
       message,
       sender,

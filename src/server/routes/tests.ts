@@ -1,17 +1,16 @@
-import express from "express";
+import express, { RequestHandler } from 'express';
 
 const router = express.Router();
 
-router.get("/", (_request, response) => {
-    response.render("tests/test1", { title: "Default test page?" });
-});
+const getTestPageHandler: RequestHandler = (_req, res) => {
+    res.render('test', { title: 'Test Page' });
+};
 
-router.get("/t1", (_request, response) => {
-    response.render("tests/test1", { title: "Test Page 1" });
-});
+const postTestHandler: RequestHandler = (_req, res) => {
+    res.json({ message: 'Test endpoint reached' });
+};
 
-router.get("/t2", (_request, response) => {
-    response.render("tests/test2", { title: "Test Page 2" });
-});
+router.get('/', getTestPageHandler);
+router.post('/', postTestHandler);
 
 export default router;

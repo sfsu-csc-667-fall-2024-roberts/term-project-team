@@ -1,56 +1,64 @@
-<%- include('partials/header') %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - Monopoly</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        .error-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+            text-align: center;
+            background-color: var(--bg-color);
+        }
 
-<div class="error-container">
-  <h1><%= message %></h1>
-  <% if (error.status) { %>
-    <h2><%= error.status %></h2>
-  <% } %>
-  <% if (error.stack && process.env.NODE_ENV === 'development') { %>
-    <pre><%= error.stack %></pre>
-  <% } %>
-  <div class="error-actions">
-    <a href="/" class="btn btn-primary">Return to Home</a>
-  </div>
-</div>
+        .error-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            color: var(--error-color);
+        }
 
-<style>
-.error-container {
-  max-width: 800px;
-  margin: 2rem auto;
-  padding: 2rem;
-  text-align: center;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+        .error-title {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--text-color);
+        }
 
-.error-container h1 {
-  color: #e74c3c;
-  margin-bottom: 1rem;
-}
+        .error-message {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            color: var(--text-muted);
+        }
 
-.error-container h2 {
-  color: #7f8c8d;
-  margin-bottom: 2rem;
-}
+        .back-button {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            color: white;
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.2s;
+        }
 
-.error-container pre {
-  background: #f8f9fa;
-  padding: 1rem;
-  border-radius: 4px;
-  overflow-x: auto;
-  text-align: left;
-  margin: 1rem 0;
-}
-
-.error-actions {
-  margin-top: 2rem;
-}
-
-.error-actions .btn {
-  padding: 0.5rem 1.5rem;
-  font-size: 1.1rem;
-}
-</style>
-
-<%- include('partials/footer') %> 
+        .back-button:hover {
+            background-color: var(--primary-dark);
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h1 class="error-title">Oops! Something went wrong</h1>
+        <p class="error-message"><%= message || 'An unexpected error occurred' %></p>
+        <a href="/lobby" class="back-button">Return to Lobby</a>
+    </div>
+</body>
+</html> 

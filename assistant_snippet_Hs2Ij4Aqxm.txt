@@ -1,0 +1,2 @@
+1|[DatabaseService] Client acquired from pool at: 2024-12-20T04:10:20.057Z
+2|[DatabaseService] Successfully connected to the database at: 2024-12-20T04:10:20.058Z 

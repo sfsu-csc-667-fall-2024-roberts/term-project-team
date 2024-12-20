@@ -1,279 +1,190 @@
-export type GamePhase = 
-  | 'waiting'
-  | 'rolling'
-  | 'property_decision'
-  | 'paying_rent'
-  | 'in_jail'
-  | 'bankrupt'
-  | 'game_over'
-  | 'playing'
-  | 'auction'
-  | 'end_turn';
+import { Request } from 'express';
+
+export type GamePhase = 'WAITING' | 'ROLL' | 'ACTION' | 'END_TURN' | 'GAME_OVER';
 
 export type GameEventType = 
-  | 'tax'
-  | 'jail'
-  | 'card'
-  | 'build'
-  | 'mortgage'
-  | 'unmortgage'
   | 'roll'
-  | 'purchase'
-  | 'trade'
+  | 'property_purchase'
+  | 'go_to_jail'
   | 'bankruptcy'
-  | 'auction_bid'
-  | 'trade_proposal'
+  | 'phase_change'
+  | 'property_mortgage'
+  | 'property_unmortgage'
+  | 'property_improvement'
   | 'pay_rent'
-  | 'move_relative'
-  | 'declare_bankruptcy';
-
-export interface GameEvent {
-  type: GameEventType;
-  playerId: number;
-  relatedPlayerId?: number;
-  propertyId?: number;
-  amount?: number;
-  position?: number;
-  description: string;
-  timestamp: Date;
-  metadata?: Record<string, any>;
-}
+  | 'collect_from_bank'
+  | 'pay_to_bank'
+  | 'jail_release'
+  | 'pass_go'
+  | 'move'
+  | 'buy'
+  | 'collect'
+  | 'pay'
+  | 'jail'
+  | 'win'
+  | 'custom'
+  | 'player_joined'
+  | 'game_start';
 
 export interface Player {
   id: number;
-  gameId: number;
-  userId: number;
   username: string;
-  position: number;
   money: number;
-  balance: number;
-  inJail: boolean;
-  jailTurns: number;
+  position: number;
+  isJailed: boolean;
+  turnsInJail: number;
   isBankrupt: boolean;
-  turnOrder: number;
-  isBot: boolean;
-  botStrategy?: 'aggressive' | 'conservative' | 'balanced';
-  botDifficulty?: 'easy' | 'medium' | 'hard';
-  createdAt?: Date;
-  updatedAt?: Date;
+  jailFreeCards: number;
+  isBot?: boolean;
+  botStrategy?: string;
+  gameId?: number;
+  color?: string;
+  properties: Property[];
 }
+
+export type PropertyType = 'property' | 'railroad' | 'utility';
+export type SpaceType = PropertyType | 'tax' | 'corner' | 'chance' | 'chest';
+export type SpaceActionType = 
+    | 'property'
+    | 'card_drawn'
+    | 'pay_tax'
+    | 'corner'
+    | 'tax'
+    | 'card'
+    | 'chance'
+    | 'chest'
+    | 'buy'
+    | 'pay_rent'
+    | 'go_to_jail'
+    | 'none';
 
 export interface Property {
   id: number;
-  gameId: number;
-  position: number;
   name: string;
-  type: 'property' | 'railroad' | 'utility';
+  position: number;
   price: number;
-  rentLevels: number[];
+  rent: number;
+  ownerId: number | null;
+  mortgaged: boolean;
+  houseCount: number;
+  hotelCount: number;
+  colorGroup: string;
+  type: 'property' | 'railroad' | 'utility';
   houseCost: number;
   hotelCost: number;
-  mortgageValue: number;
-  colorGroup: string;
-  ownerId: number | null;
-  isMortgaged: boolean;
-  houseCount: number;
-  hasHotel: boolean;
-  rentAmount?: number;
+  rentLevels: number[];
+  currentRent: number;
+  canBeImproved: boolean;
+  maxHouses: number;
+  maxHotels: number;
+  houses: number;
+  hotels: number;
+  gameId: number;
+  color: string;
 }
 
 export interface GameState {
   id: number;
-  phase: GamePhase;
-  currentPlayerId: number;
-  currentPlayerIndex: number;
   players: Player[];
   properties: Property[];
-  diceRolls: PlayerWithRoll[];
-  turnOrder: number[];
+  currentPlayerId: number;
+  gamePhase: GamePhase;
+  winner: number | null;
   doublesCount: number;
-  jailTurns: Record<number, number>;
-  bankruptPlayers: number[];
-  jailFreeCards: Record<number, number>;
   turnCount: number;
-  freeParkingPot: number;
+  bankruptPlayers: number[];
+  jailFreeCards: { [key: number]: number };
+  gameLog: GameEvent[];
+  turnOrder: number[];
+  pendingTrades: Trade[];
+  diceRoll?: number[];
   lastRoll?: number;
   lastDice?: [number, number];
   lastDoubles?: boolean;
-  lastPosition?: number;
-  drawnCard?: Card;
-  currentPropertyDecision?: {
-    propertyId: number;
-    playerId: number;
-    type: 'purchase' | 'auction';
-  };
-  currentRentOwed?: {
-    amount: number;
-    fromPlayerId: number;
-    toPlayerId: number;
-    propertyId: number;
-  };
-  winner?: number;
-  pendingTrades?: TradeProposal[];
-  auction?: AuctionState;
-  lastAction?: string;
-  lastActionTimestamp?: string;
-  gameLog?: GameEvent[];
-  dice_rolls?: { id: number; roll: number }[];
+  currentPropertyDecision?: PropertyDecision;
+  currentRentOwed?: RentOwed;
 }
 
-export interface PlayerWithRoll extends Player {
-  roll?: number;
-  dice?: [number, number];
-  hasRolled?: boolean;
+export interface GameEvent {
+  type: string;
+  playerId?: number;
+  description: string;
+  timestamp?: number;
+  metadata?: any;
+  propertyId?: number;
+  relatedPlayerId?: number;
+  amount?: number;
+  position?: number;
 }
 
-export interface TradeProposal {
+export interface Trade {
+  id: number;
   fromPlayerId: number;
   toPlayerId: number;
   offeredProperties: number[];
   requestedProperties: number[];
   offeredMoney: number;
   requestedMoney: number;
-  id?: number;
-  status?: 'pending' | 'accepted' | 'rejected';
-  timestamp?: string;
+  status: 'pending' | 'accepted' | 'rejected';
 }
 
-export interface AuctionState {
+export interface PropertyDecision {
   propertyId: number;
-  currentBid: number;
-  currentBidder: number | null;
-  timeRemaining: number;
-  startTime: string;
+  canBuy: boolean;
+  mustPayRent: boolean;
+  rentAmount?: number;
 }
 
-export type CardActionType = 
-  | 'move'
-  | 'move_to_nearest'
-  | 'collect'
-  | 'pay'
-  | 'repairs'
-  | 'collect_from_each'
-  | 'jail'
-  | 'jail_free'
-  | 'move_relative';
-
-export interface CardAction {
-  type: CardActionType;
-  destination?: number;
-  propertyType?: 'railroad' | 'utility';
-  value?: number;
-  hotelValue?: number;
-  collectFromEach?: number;
+export interface RentOwed {
+  amount: number;
+  fromPlayerId: number;
+  toPlayerId: number;
+  propertyId: number;
 }
 
 export interface Card {
-  id?: number;
-  type: 'chance' | 'community_chest';
+  type: 'chance' | 'chest' | 'move' | 'collect' | 'pay' | 'jail';
   text: string;
+  destination?: number;
+  amount?: number;
   action: CardAction;
 }
 
-export interface BoardSpace {
-  position: number;
-  name: string;
-  type: string;
-  price?: number;
-  rent?: number[];
-  color?: string;
-  action?: string;
-  rentLevels?: number[];
-  houseCost?: number;
-  hotelCost?: number;
-  mortgageValue?: number;
-  colorGroup?: string;
-}
-
-export interface ExtendedBoardSpace {
-  position: number;
-  name: string;
-  type: 'property' | 'railroad' | 'utility' | 'tax' | 'chest' | 'chance' | 'corner' | 'jail';
-  price?: number;
-  rentLevels?: number[];
-  houseCost?: number;
-  hotelCost?: number;
-  mortgageValue?: number;
-  colorGroup?: string;
-  color?: string;
-  rent?: number;
-  buildings?: number;
-  isMortgaged?: boolean;
-  ownerId?: number | null;
-}
-
-export type GameAction = {
-  type: string;
-  payload: any;
-};
-
-export type RollAction = GameAction & {
-  type: 'ROLL';
-  payload: {
-    playerId: number;
-    roll: number[];
-  };
-};
-
-export type PurchaseAction = GameAction & {
-  type: 'PURCHASE';
-  payload: {
-    playerId: number;
-    propertyId: number;
-  };
-};
-
-export type PayRentAction = GameAction & {
-  type: 'PAY_RENT';
-  payload: {
-    fromPlayerId: number;
-    toPlayerId: number;
-    amount: number;
-  };
-};
-
-export type BankruptcyAction = GameAction & {
-  type: 'BANKRUPTCY';
-  payload: {
-    playerId: number;
-  };
-};
-
-export type JailAction = GameAction & {
-  type: 'JAIL';
-  payload: {
-    playerId: number;
-    inJail: boolean;
-  };
-};
-
-export type SpaceAction = {
-  type: string;
-  message: string;
-  data?: any;
-  property?: Property;
-  card?: Card;
-  tax?: {
-    name: string;
-    amount: number;
-  };
+export interface CardAction {
+  type: 'move' | 'jail' | 'collect' | 'pay' | 'repair' | 'advance' | 'move_to_nearest' | 'move_relative' | 'collect_from_each' | 'jail_free' | 'repairs';
+  destination?: number;
   amount?: number;
-};
-
-export interface RentPaymentResult {
-  success: boolean;
-  message: string;
-  payerBalance: number;
-  ownerBalance: number;
+  value?: number | string;
+  propertyType?: 'railroad' | 'utility';
+  houseFee?: number;
+  hotelFee?: number;
+  collectFromEach?: number;
+  goToJail?: boolean;
+  message?: string;
 }
 
-export interface GameData {
-  gameId: number;
-  currentUserId: number | null;
-  currentPlayerId: number | null;
-  gameState: GameState;
-  players: Player[];
-  properties: Property[];
+export interface DiceRoll {
+  id: number;
+  roll: number;
+  dice: [number, number];
+  success?: boolean;
+  message?: string;
+  newPosition?: number;
+  spaceAction?: SpaceAction;
+}
+
+export interface Game {
+  id: number;
+  state: GameState;
+  status: 'waiting' | 'in-progress' | 'finished';
+  ownerId: number;
+  createdAt: number;
+  updatedAt: number;
+  maxPlayers?: number;
+  minPlayers?: number;
+  name?: string;
+  password?: string;
+  isPrivate?: boolean;
 }
 
 export interface BotDecision {
@@ -282,6 +193,33 @@ export interface BotDecision {
   action: string;
   data: Record<string, any>;
   property?: Property;
+  amount?: number;
+  confidence?: number;
+  reasoning?: string;
+}
+
+export interface PlayerWithRoll extends Player {
+  roll?: number;
+  dice?: [number, number];
+}
+
+export interface BoardSpace {
+  position: number;
+  name: string;
+  type: SpaceType;
+  price?: number;
+  rent?: number;
+  colorGroup?: string;
+}
+
+export interface ExtendedBoardSpace extends BoardSpace {
+  rentLevels?: number[];
+  houseCost?: number;
+  hotelCost?: number;
+  mortgageValue?: number;
+  tax?: number;
+  amount?: number;
+  color?: string;
 }
 
 export interface GameStatistics {
@@ -315,7 +253,7 @@ export interface TradeStatistics {
   toPlayerId: number;
   propertiesTraded: number;
   moneyExchanged: number;
-  timestamp: Date;
+  timestamp: number;
 }
 
 export interface PropertyStatistics {
@@ -328,32 +266,154 @@ export interface PropertyStatistics {
   hotelsBuilt: number;
 }
 
-export interface WebSocketMessage {
-  type: 'state_update' | 'player_action';
-  state?: GameState;
-  players?: Player[];
-  properties?: Property[];
-  action?: GameAction;
+export interface SpaceAction {
+  type: SpaceActionType;
+  amount?: number;
+  card?: any;
+  action?: string;
 }
 
-export interface Game {
-  id: number;
+export interface GameData {
+  gameId: number;
+  currentUserId: number;
+  currentPlayerId: number;
+  token: string;
+  players: Player[];
+  properties: Property[];
   gameState: GameState;
-  status: 'waiting' | 'in-progress' | 'finished';
-  ownerId: number;
-  createdAt: Date;
-  updatedAt: Date;
+}
+
+export interface AuthRequest extends Request {
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+  };
+}
+
+declare module 'express-session' {
+  interface Session {
+    token?: string;
+    userId?: number;
+    username?: string;
+    returnTo?: string;
+  }
+}
+
+export type WebSocketMessageType = 
+    | 'roll'
+    | 'roll_result'
+    | 'end_turn'
+    | 'buy_property'
+    | 'pay_rent'
+    | 'state_update'
+    | 'error'
+    | 'ping'
+    | 'pong'
+    | 'player_joined'
+    | 'player_action'
+    | 'sync_request'
+    | 'draw_card'
+    | 'pay_tax'
+    | 'jail_action'
+    | 'improve_property'
+    | 'sell_improvement'
+    | 'tax_due'
+    | 'card_drawn'
+    | 'JOIN_GAME'
+    | 'game_action'
+    | 'game_state_update'
+    | 'game_error'
+    | 'gameStateUpdate'
+    | 'gameEvent'
+    | 'diceRoll'
+    | 'spaceAction'
+    | 'request_game_state';
+
+export interface WebSocketMessage {
+    type: WebSocketMessageType;
+    playerId: number;
+    gameId?: number;
+    payload: any;
+    data?: {
+        propertyId?: number;
+        amount?: number;
+        cardType?: 'chance' | 'community_chest';
+        action?: string;
+        [key: string]: any;
+    };
+}
+
+export interface WebSocketError {
+    type: 'error';
+    error: string;
+}
+
+export interface WebSocketGameAction {
+    type: 'game_action';
+    gameId: number;
+    action: string;
+    data: {
+        propertyId?: number;
+        amount?: number;
+        cardType?: 'chance' | 'community_chest';
+        action?: string;
+        [key: string]: any;
+    };
 }
 
 export interface RollResponse {
   success: boolean;
   message?: string;
-  roll: number;
-  dice: [number, number];
-  isDoubles: boolean;
-  newPosition: number;
-  spaceAction?: SpaceAction;
-  currentPlayer: Player;
+  roll?: number;
+  dice?: [number, number];
+  isDoubles?: boolean;
   gameState?: GameState;
   players?: Player[];
+  spaceAction?: SpaceAction;
+  currentPlayer?: Player;
+  newPosition?: number;
+}
+
+export interface PurchaseResponse {
+  success: boolean;
+  property: Property;
+  playerBalance: number;
+}
+
+export interface RentPaymentResult {
+  success: boolean;
+  message: string;
+  payerBalance: number;
+  ownerBalance: number;
+}
+
+export interface TradeProposal {
+  id: number;
+  fromPlayerId: number;
+  toPlayerId: number;
+  offeredProperties: number[];
+  requestedProperties: number[];
+  offeredMoney: number;
+  requestedMoney: number;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: number;
+  timestamp?: number;
+}
+
+export interface MonopolyGameData {
+    gameId: number;
+    currentUserId: number;
+    currentPlayerId: number;
+    token: string;
+    players: Player[];
+    properties: Property[];
+    gameState: GameState;
+    game: GameInstance;
+}
+
+export interface GameInstance {
+    startGame(): Promise<void>;
+    initializeGame(): Promise<void>;
+    fetchAndUpdateGameState(): Promise<void>;
 }

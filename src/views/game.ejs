@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monopoly Game</title>
+    <link rel="stylesheet" href="/dist/css/styles.css">
+    <script>
+        // Pass server-side data to client
+        window.GAME_ID = '<%= gameId %>';
+        window.USER_TOKEN = '<%= token %>';
+        window.INITIAL_STATE = <%- JSON.stringify(initialState) %>;
+        window.monopolyGameData = {
+            gameId: <%= gameId %>,
+            currentUserId: <%= currentUserId %>,
+            currentPlayerId: <%= currentPlayerId %>,
+            token: '<%= token %>',
+            players: <%- JSON.stringify(initialState.players) %>,
+            properties: <%- JSON.stringify(initialState.properties) %>,
+            gameState: <%- JSON.stringify(initialState) %>
+        };
+    </script>
+</head>
+<body>
+    <%- include('partials/header') %>
+
+    <div class="game-container">
+        <header class="game-header">
+            <div class="header-left">
+                <a href="/" class="game-title">Monopoly</a>
+                <span class="game-id">Game #<%= gameId %></span>
+            </div>
+            <div class="header-right">
+                <span class="user-info">Playing as <%= username %></span>
+                <div class="header-actions">
+                    <button class="header-action-button" id="togglePlayers">Players</button>
+                    <button class="header-action-button" id="toggleProperties">Properties</button>
+                    <button class="header-action-button danger" id="leaveGame">Leave Game</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="game-content">
+            <section class="players-section">
+                <div class="panel-header">
+                    <h2>Players</h2>
+                </div>
+                <div class="panel-content" id="players-list">
+                    <!-- Players will be rendered here -->
+                </div>
+            </section>
+
+            <div class="game-board-wrapper">
+                <div id="monopoly-board">
+                    <!-- Board will be rendered here -->
+                </div>
+                <div class="game-controls">
+                    <button class="btn btn-primary" id="rollDice" disabled>Roll Dice</button>
+                    <button class="btn btn-secondary" id="endTurn" disabled>End Turn</button>
+                </div>
+            </div>
+
+            <section class="properties-section">
+                <div class="panel-header">
+                    <h2>Properties</h2>
+                </div>
+                <div class="properties-filters">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="owned">Owned</button>
+                </div>
+                <div class="panel-content" id="properties-list">
+                    <!-- Properties will be rendered here -->
+                </div>
+            </section>
+        </div>
+
+        <div class="message-history-panel hidden">
+            <div class="message-history-header">
+                <h3>Game History</h3>
+                <button class="close-history-button">&times;</button>
+            </div>
+            <div class="message-history-content">
+                <!-- Game history messages will be rendered here -->
+            </div>
+        </div>
+
+        <div class="game-messages">
+            <!-- Game messages will be rendered here -->
+        </div>
+    </div>
+
+    <%- include('partials/footer') %>
+
+    <!-- Dice Container -->
+    <div class="dice-container">
+        <div class="dice" id="dice1">1</div>
+        <div class="dice" id="dice2">1</div>
+    </div>
+
+    <script src="/dist/js/game.bundle.js"></script>
+</body>
+</html> 

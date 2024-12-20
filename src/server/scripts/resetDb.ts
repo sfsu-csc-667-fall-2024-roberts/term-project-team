@@ -1,71 +1,95 @@
-import { pool } from '../db/config';
-import runMigrations from '../db/migrations/runMigrations';
+import { DatabaseService } from '../services/databaseService';
+import { runMigrations } from '../db/migrations/runMigrations';
+
+async function checkTableStructure(client: any) {
+    const result = await client.query(`
+        SELECT column_name, data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'games'
+        ORDER BY ordinal_position;
+    `);
+    console.log('Games table structure:', result.rows);
+}
+
+async function dropTables(db: DatabaseService) {
+    console.log('[resetDb] Starting dropTables at:', new Date().toISOString());
+    const client = await db.getPool().connect();
+    try {
+        console.log('[resetDb] Database connection successful at:', new Date().toISOString());
+        console.log('[resetDb] Starting table drop at:', new Date().toISOString());
+        await client.query('BEGIN');
+
+        // Drop all tables in the public schema
+        await client.query(`
+            DO $$ DECLARE
+                r RECORD;
+            BEGIN
+                FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+                    EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+                END LOOP;
+            END $$;
+        `);
+
+        await client.query('COMMIT');
+        console.log('[resetDb] All tables dropped successfully at:', new Date().toISOString());
+    } catch (error) {
+        console.error('[resetDb] Error dropping tables at:', new Date().toISOString(), error);
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        console.log('[resetDb] Releasing client at:', new Date().toISOString());
+        client.release();
+        console.log('[resetDb] Client released at:', new Date().toISOString());
+    }
+}
 
 async function resetDb() {
-  try {
-    console.log('=== Starting Database Reset ===');
-    
-    // Drop all tables with CASCADE to ensure clean state
-    console.log('Dropping all tables...');
-    await pool.query(`
-      DROP TABLE IF EXISTS properties CASCADE;
-      DROP TABLE IF EXISTS players CASCADE;
-      DROP TABLE IF EXISTS games CASCADE;
-      DROP TABLE IF EXISTS users CASCADE;
-      DROP TABLE IF EXISTS "session" CASCADE;
-      DROP TABLE IF EXISTS "user_sessions" CASCADE;
-      DROP TABLE IF EXISTS migrations CASCADE;
-    `);
-    console.log('Tables dropped successfully');
+    console.log('[resetDb] Starting reset process at:', new Date().toISOString());
+    const db = DatabaseService.getInstance();
+    try {
+        await dropTables(db);
+        
+        // Run migrations to recreate tables
+        console.log('[resetDb] Starting migrations at:', new Date().toISOString());
+        await runMigrations();
+        console.log('[resetDb] Migrations completed at:', new Date().toISOString());
 
-    // Reset sequences
-    console.log('Resetting sequences...');
-    await pool.query(`
-      DROP SEQUENCE IF EXISTS properties_id_seq CASCADE;
-      DROP SEQUENCE IF EXISTS players_id_seq CASCADE;
-      DROP SEQUENCE IF EXISTS games_id_seq CASCADE;
-      DROP SEQUENCE IF EXISTS users_id_seq CASCADE;
-      DROP SEQUENCE IF EXISTS migrations_id_seq CASCADE;
-    `);
-    console.log('Sequences reset successfully');
+        // Check table structure
+        console.log('[resetDb] Checking table structure at:', new Date().toISOString());
+        const client = await db.getPool().connect();
+        try {
+            await checkTableStructure(client);
+            console.log('[resetDb] Table structure check completed at:', new Date().toISOString());
+        } finally {
+            console.log('[resetDb] Releasing structure check client at:', new Date().toISOString());
+            client.release();
+        }
 
-    // Run all migrations
-    console.log('\nRunning migrations...');
-    await runMigrations();
-    
-    // Verify database state
-    console.log('\nVerifying database state...');
-    const tables = await pool.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-      AND table_type = 'BASE TABLE'
-      ORDER BY table_name;
-    `);
-    console.log('Available tables:', tables.rows.map(r => r.table_name).join(', '));
-
-    console.log('=== Database Reset Complete ===');
-  } catch (error) {
-    console.error('Error resetting database:', error);
-    throw error;
-  }
+        console.log('[resetDb] Database reset completed at:', new Date().toISOString());
+    } catch (error) {
+        console.error('[resetDb] Error during reset at:', new Date().toISOString(), error);
+        throw error;
+    }
 }
 
-// Run if called directly
+// Run if this file is executed directly
 if (require.main === module) {
-  resetDb()
-    .catch(error => {
-      console.error('Failed to reset database:', error);
-      process.exit(1);
-    })
-    .finally(async () => {
-      try {
-        await pool.end();
-      } catch (error) {
-        console.error('Error closing pool:', error);
-      }
-      process.exit(0);
-    });
-}
-
-export default resetDb; 
+    console.log('[resetDb] Starting direct execution at:', new Date().toISOString());
+    (async () => {
+        const db = DatabaseService.getInstance();
+        try {
+            await resetDb();
+            console.log('[resetDb] Reset process completed at:', new Date().toISOString());
+            console.log('[resetDb] Initiating database close at:', new Date().toISOString());
+            await db.close(true);
+            console.log('[resetDb] Database closed, exiting at:', new Date().toISOString());
+            process.exit(0);
+        } catch (error) {
+            console.error('[resetDb] Reset process failed at:', new Date().toISOString(), error);
+            console.log('[resetDb] Attempting to close database after error at:', new Date().toISOString());
+            await db.close(true);
+            console.log('[resetDb] Database closed after error, exiting at:', new Date().toISOString());
+            process.exit(1);
+        }
+    })();
+} 

@@ -1,383 +1,253 @@
-import express, { Request, Response, Router } from 'express';
-import { Pool } from 'pg';
-import {
-  GameState,
-  Player,
-  Property,
-  SpaceAction,
-  GameAction,
-  Card,
-  TradeProposal,
-  AuctionState,
-  RentPaymentResult,
-  GameData,
-  BotDecision,
-  ExtendedBoardSpace,
-  RollAction,
-  PurchaseAction,
-  PayRentAction,
-  BankruptcyAction,
-  JailAction,
-  WebSocketMessage,
-  Game
-} from '../../shared/types';
-import { gameService } from '../services/gameService';
-import { cardService } from '../services/cardService';
-import { botService } from '../services/botService';
-import { gameHistoryService } from '../services/gameHistoryService';
-import { gameWebSocket } from '../websocket/gameWebSocket';
+import express, { Request, Response, RequestHandler } from 'express';
+import { GameService } from '../services/gameService';
+import { PlayerService } from '../services/playerService';
+import { PropertyService } from '../services/propertyService';
 import { requireAuth } from '../middleware/auth';
+import { generateToken } from '../utils/auth';
+import { AuthRequest } from '../../shared/types';
 
-// Interface for database game response
-interface DBGame {
-  id: number;
-  owner_id: number;
-  status: 'waiting' | 'in-progress' | 'finished';
-  createdat: Date;
-  updatedat: Date;
-  game_state: GameState;
-}
+const router = express.Router();
+const gameService = GameService.getInstance();
+const playerService = PlayerService.getInstance();
+const propertyService = PropertyService.getInstance();
 
-// Convert Game type to DBGame type
-const convertToDBGame = (game: Game | null): DBGame | null => {
-  if (!game) return null;
-  return {
-    id: game.id,
-    owner_id: game.ownerId,
-    status: game.status,
-    createdat: game.createdAt,
-    updatedat: game.updatedAt,
-    game_state: game.gameState
-  };
+// Create a new game
+const createGameHandler: RequestHandler = async (req, res) => {
+    try {
+        const { name, maxPlayers } = req.body;
+        const userId = (req as AuthRequest).user?.id;
+
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const game = await gameService.createGame(name, maxPlayers);
+        res.status(201).json(game);
+    } catch (error) {
+        console.error('Error creating game:', error);
+        res.status(500).json({ error: 'Failed to create game' });
+    }
 };
 
-const router: Router = express.Router();
-
-// Helper functions for SpaceAction
-const createSpaceAction = (type: string, message: string, data?: any): SpaceAction => ({
-  type,
-  message,
-  data
-});
-
-// Route handlers with proper typing
-router.get('/:gameId', requireAuth, async (req: Request<{ gameId: string }>, res: Response): Promise<void> => {
-  const gameId = parseInt(req.params.gameId);
-  console.log('\n=== Game Route Handler ===');
-  console.log('Accessing game:', gameId);
-  console.log('User:', (req as any).user);
-  console.log('Session:', req.session);
-  
-  try {
-    console.log('Fetching game data...');
-    const gameResult = await gameService.getGameById(gameId);
-    const game = convertToDBGame(gameResult);
-    console.log('Game data:', JSON.stringify(game, null, 2));
-    
-    if (!game) {
-      console.log('Game not found');
-      res.status(404).send('Game not found');
-      return;
-    }
-
-    console.log('Fetching players...');
-    const players = await gameService.getGamePlayers(gameId);
-    console.log('Players:', JSON.stringify(players, null, 2));
-    
-    console.log('Fetching properties...');
-    const properties = await gameService.getGameProperties(gameId);
-    console.log('Properties:', JSON.stringify(properties, null, 2));
-
-    const typedSession = req.session as any;
-    const currentPlayer = players.find(p => p.userId === typedSession.userId);
-    console.log('Looking for player with userId:', typedSession.userId);
-    console.log('Available players:', players.map(p => ({ id: p.id, userId: p.userId, username: p.username })));
-    
-    const currentPlayerId = currentPlayer?.id || -1;
-    console.log('Current player ID:', currentPlayerId);
-    console.log('Current player:', currentPlayer);
-
-    // Initialize default game state with proper structure
-    const defaultGameState: GameState = {
-      id: gameId,
-      phase: 'waiting',
-      currentPlayerId: currentPlayerId,
-      currentPlayerIndex: 0,
-      players: players.map(player => ({
-        ...player,
-        position: player.position || 0,
-        money: player.money || 1500,
-        balance: player.balance || 1500,
-        inJail: player.inJail || false,
-        jailTurns: player.jailTurns || 0,
-        isBankrupt: player.isBankrupt || false,
-        turnOrder: player.turnOrder || 0
-      })),
-      properties: properties,
-      diceRolls: [],
-      turnOrder: [],
-      doublesCount: 0,
-      jailTurns: {},
-      bankruptPlayers: [],
-      jailFreeCards: {},
-      turnCount: 0,
-      freeParkingPot: 0,
-      lastRoll: undefined,
-      lastDice: undefined,
-      lastDoubles: undefined,
-      lastPosition: undefined,
-      drawnCard: undefined,
-      currentPropertyDecision: undefined,
-      currentRentOwed: undefined,
-      winner: undefined,
-      pendingTrades: [],
-      auction: undefined,
-      lastAction: undefined,
-      lastActionTimestamp: undefined,
-      gameLog: []
-    };
-
-    // Ensure game state has all required properties
-    const gameState: GameState = {
-      ...defaultGameState,
-      ...(game.game_state || {}),
-      currentPlayerId: game.game_state?.currentPlayerId || currentPlayerId,
-      diceRolls: game.game_state?.diceRolls || [],
-      players: players,
-      properties: properties
-    };
-
-    // Update game state in database if needed
-    if (JSON.stringify(gameState) !== JSON.stringify(game.game_state)) {
-      await gameService.updateGameState(gameId, gameState);
-      game.game_state = gameState;
-    }
-
-    // Validate game state before rendering
-    console.log('Validating game state before render:', {
-      phase: gameState.phase,
-      diceRolls: gameState.diceRolls,
-      players: players.length,
-      currentPlayerId: currentPlayerId
-    });
-
-    // Ensure diceRolls is an array
-    if (!Array.isArray(gameState.diceRolls)) {
-      gameState.diceRolls = [];
-    }
-
-    console.log('Rendering game view...');
-    res.render('game', {
-      game,
-      players,
-      properties,
-      currentUserId: typedSession.userId,
-      currentPlayerId,
-      gameState,
-      username: typedSession.username
-    });
-    console.log('Game view rendered successfully');
-  } catch (error) {
-    console.error('Error in game route:', error);
-    res.status(500).send('Server error');
-  }
-});
-
-// Add a new route for getting game state via API
-router.get('/:gameId/state', requireAuth, async (req: Request<{ gameId: string }>, res: Response): Promise<void> => {
-  const gameId = parseInt(req.params.gameId);
-  
-  try {
-    const gameResult = await gameService.getGameById(gameId);
-    const game = convertToDBGame(gameResult);
-    if (!game) {
-      res.status(404).json({ error: 'Game not found' });
-      return;
-    }
-
-    const players = await gameService.getGamePlayers(gameId);
-    const properties = await gameService.getGameProperties(gameId);
-    const typedSession = req.session as any;
-
-    // Get current player from game state or find in players
-    const currentPlayer = players.find(p => p.userId === typedSession.userId);
-    const currentPlayerId = currentPlayer?.id || -1;
-
-    const gameData: GameData = {
-      gameId,
-      currentUserId: typedSession.userId || null,
-      currentPlayerId: currentPlayerId,
-      gameState: game.game_state || {
-        id: gameId,
-        phase: 'waiting',
-        currentPlayerId: currentPlayerId,
-        currentPlayerIndex: 0,
-        players: players,
-        properties: properties,
-        diceRolls: [],
-        turnOrder: [],
-        doublesCount: 0,
-        jailTurns: {},
-        bankruptPlayers: [],
-        jailFreeCards: {},
-        turnCount: 0,
-        freeParkingPot: 0,
-        gameLog: []
-      },
-      players,
-      properties
-    };
-
-    res.json(gameData);
-  } catch (error) {
-    console.error('Error getting game:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-interface RollRequestBody {
-  playerId: number;
-}
-
-router.post('/:gameId/roll', requireAuth, (req: Request<{ gameId: string }, any, RollRequestBody>, res: Response) => {
-  const gameId = parseInt(req.params.gameId);
-  const playerId = req.body.playerId;
-  
-  Promise.resolve().then(async () => {
+// Join a game
+const joinGameHandler: RequestHandler = async (req, res) => {
     try {
-      const rollResponse = await gameService.processRoll(gameId, playerId);
+        const gameId = parseInt(req.params.gameId);
+        const userId = (req as AuthRequest).user?.id;
 
-      const rollAction: RollAction = {
-        type: 'ROLL',
-        payload: {
-          playerId,
-          roll: rollResponse.dice
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
         }
-      };
 
-      await gameWebSocket.broadcastGameAction(gameId, rollAction);
-      await broadcastGameState(gameId);
-
-      res.json(rollResponse);
-    } catch (error) {
-      console.error('Error processing roll:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-});
-
-interface BuyRequestBody {
-  playerId: string;
-  propertyId: string;
-}
-
-router.post('/:gameId/buy', requireAuth, (req: Request<{ gameId: string }, any, BuyRequestBody>, res: Response) => {
-  const gameId = parseInt(req.params.gameId);
-  
-  Promise.resolve().then(async () => {
-    try {
-      const playerId = parseInt(req.body.playerId);
-      const propertyId = parseInt(req.body.propertyId);
-
-      const property = await gameService.getPropertyByPosition(gameId, propertyId);
-      const player = await gameService.getPlayerById(playerId);
-
-      if (!property || !player) {
-        return res.status(400).json({ error: 'Invalid property or player' });
-      }
-
-      if (player.money < property.price) {
-        return res.status(400).json({ error: 'Insufficient funds' });
-      }
-
-      await gameService.updatePlayer(playerId, { money: player.money - property.price });
-      await gameService.updateProperty(propertyId, { ownerId: playerId });
-
-      const updatedPlayer = await gameService.getPlayerById(playerId);
-      const updatedProperty = await gameService.getPropertyByPosition(gameId, propertyId);
-      const gameState = await gameService.getGameState(gameId);
-
-      const purchaseAction: PurchaseAction = {
-        type: 'PURCHASE',
-        payload: {
-          playerId,
-          propertyId
+        const player = await playerService.getPlayerByUserId(userId);
+        if (!player) {
+            res.status(403).json({ error: 'Player not found' });
+            return;
         }
-      };
 
-      await gameWebSocket.broadcastGameAction(gameId, purchaseAction);
-      await broadcastGameState(gameId);
-
-      res.json({
-        success: true,
-        player: updatedPlayer,
-        property: updatedProperty,
-        gameState
-      });
+        const result = await gameService.joinGame(gameId, player.id);
+        res.json(result);
     } catch (error) {
-      console.error('Error buying property:', error);
-      res.status(500).json({ error: 'Internal server error' });
+        console.error('Error joining game:', error);
+        res.status(500).json({ error: 'Failed to join game' });
     }
-  });
-});
-
-interface PayRentRequestBody {
-  fromPlayerId: number;
-  toPlayerId: number;
-  amount: number;
-}
-
-router.post('/:gameId/pay-rent', requireAuth, (req: Request<{ gameId: string }, any, PayRentRequestBody>, res: Response) => {
-  const gameId = parseInt(req.params.gameId);
-  const { fromPlayerId, toPlayerId, amount } = req.body;
-
-  Promise.resolve().then(async () => {
-    try {
-      const result = await gameService.payRent(gameService.pool, fromPlayerId, toPlayerId, amount);
-      const gameState = await gameService.getGameState(gameId);
-
-      const payRentAction: PayRentAction = {
-        type: 'PAY_RENT',
-        payload: {
-          fromPlayerId,
-          toPlayerId,
-          amount
-        }
-      };
-
-      await gameWebSocket.broadcastGameAction(gameId, payRentAction);
-      await broadcastGameState(gameId);
-
-      res.json({
-        ...result,
-        gameState
-      });
-    } catch (error) {
-      console.error('Error paying rent:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-});
-
-// Helper function to broadcast game state update
-const broadcastGameState = async (gameId: number): Promise<void> => {
-  const [gameState, players, properties] = await Promise.all([
-    gameService.getGameState(gameId),
-    gameService.getGamePlayers(gameId),
-    gameService.getGameProperties(gameId)
-  ]);
-
-  const message: WebSocketMessage = {
-    type: 'state_update',
-    players,
-    properties
-  };
-
-  if (gameState) {
-    message.state = gameState;
-  }
-
-  await gameWebSocket.broadcast(gameId, message);
 };
+
+// Get game state
+const getGameStateHandler: RequestHandler = async (req: Request, res: Response) => {
+    try {
+        const gameId = parseInt(req.params.gameId);
+        const userId = (req as AuthRequest).user?.id;
+
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const gameState = await gameService.getGameState(gameId);
+        res.json(gameState);
+    } catch (error) {
+        console.error('Error getting game state:', error);
+        res.status(500).json({ error: 'Failed to get game state' });
+    }
+};
+
+// Start game
+export const startGameHandler = async (req: Request, res: Response): Promise<void> => {
+    console.log('Start game request received');
+    try {
+        const gameId = parseInt(req.params.gameId);
+        const userId = req.user?.id;
+
+        console.log(`Starting game ${gameId} for user ${userId}`);
+
+        if (!gameId || !userId) {
+            console.error('Missing gameId or userId:', { gameId, userId });
+            res.status(400).json({ error: 'Missing required parameters' });
+            return;
+        }
+
+        const gameService = GameService.getInstance();
+        console.log('Calling gameService.startGame');
+        const result = await gameService.startGame(gameId, userId);
+        console.log('Game started successfully:', result);
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error in startGameHandler:', error);
+        res.status(500).json({ error: 'Failed to start game' });
+    }
+};
+
+// Roll dice
+const rollDiceHandler: RequestHandler = async (req: Request, res: Response) => {
+    try {
+        const gameId = parseInt(req.params.gameId);
+        const userId = (req as AuthRequest).user?.id;
+
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const result = await gameService.handleRoll(gameId, userId);
+        res.json(result);
+    } catch (error) {
+        console.error('Error rolling dice:', error);
+        res.status(500).json({ error: 'Failed to roll dice' });
+    }
+};
+
+// End turn
+const endTurnHandler: RequestHandler = async (req: Request, res: Response) => {
+    try {
+        const gameId = parseInt(req.params.gameId);
+        const userId = (req as AuthRequest).user?.id;
+
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const result = await gameService.endTurn(gameId, userId);
+        res.json(result);
+    } catch (error) {
+        console.error('Error ending turn:', error);
+        res.status(500).json({ error: 'Failed to end turn' });
+    }
+};
+
+// Purchase property
+const purchasePropertyHandler: RequestHandler = async (req: Request, res: Response) => {
+    try {
+        const gameId = parseInt(req.params.gameId);
+        const propertyId = parseInt(req.params.propertyId);
+        const userId = (req as AuthRequest).user?.id;
+
+        if (!userId) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const result = await propertyService.purchaseProperty(propertyId, userId);
+        res.json({ success: result });
+    } catch (error) {
+        console.error('Error purchasing property:', error);
+        res.status(500).json({ error: 'Failed to purchase property' });
+    }
+};
+
+// Pay rent
+const payRentHandler: RequestHandler = async (req, res) => {
+    try {
+        const gameId = parseInt(req.params.id);
+        const fromPlayerId = parseInt(req.body.fromPlayerId);
+        const toPlayerId = parseInt(req.body.toPlayerId);
+        const amount = parseInt(req.body.amount);
+        const success = await playerService.payRent(fromPlayerId, toPlayerId, amount, gameId);
+        
+        if (success) {
+            const gameState = await gameService.getGameState(gameId);
+            res.json({ success: true, gameState });
+        } else {
+            res.status(400).json({ error: 'Failed to pay rent' });
+        }
+    } catch (error: any) {
+        console.error('Error paying rent:', error);
+        res.status(error.status || 500).json({ error: error.message || 'Failed to pay rent' });
+    }
+};
+
+// Render game view
+const renderGameHandler: RequestHandler = async (req, res) => {
+    try {
+        const gameId = parseInt(req.params.gameId);
+        const userId = (req as AuthRequest).user?.id;
+
+        if (!userId) {
+            res.redirect('/login');
+            return;
+        }
+
+        const game = await gameService.getGameById(gameId);
+        if (!game) {
+            res.status(404).render('error', { message: 'Game not found' });
+            return;
+        }
+
+        const player = await playerService.getPlayerByUserId(userId);
+        if (!player) {
+            res.status(403).render('error', { message: 'Player not found' });
+            return;
+        }
+
+        const gameState = await gameService.getGameState(gameId);
+        const properties = await propertyService.getPropertiesInGame(gameId);
+        
+        // Generate token with player data
+        const token = generateToken({
+            id: userId,
+            username: player.username,
+            gameId
+        });
+
+        // Group properties by color
+        const groupedProperties = properties.reduce((acc: any, prop: any) => {
+            if (!acc[prop.colorGroup]) {
+                acc[prop.colorGroup] = [];
+            }
+            acc[prop.colorGroup].push(prop);
+            return acc;
+        }, {});
+
+        res.render('game', {
+            gameId,
+            currentUserId: userId,
+            currentPlayerId: player.id,
+            username: player.username,
+            token,
+            players: gameState?.players || [],
+            properties,
+            groupedProperties,
+            gameState: gameState || { players: [], properties: [], currentPlayerId: -1 }
+        });
+    } catch (error) {
+        console.error('Error rendering game view:', error);
+        res.status(500).render('error', { message: 'Failed to load game' });
+    }
+};
+
+// Route handlers
+router.post('/', requireAuth, createGameHandler);
+router.post('/:gameId/join', requireAuth, joinGameHandler);
+router.get('/:gameId/state', requireAuth, getGameStateHandler);
+router.post('/:gameId/start', requireAuth, startGameHandler);
+router.post('/:gameId/roll', requireAuth, rollDiceHandler);
+router.post('/:gameId/end-turn', requireAuth, endTurnHandler);
+router.post('/:gameId/properties/:propertyId/purchase', requireAuth, purchasePropertyHandler);
+router.post('/:id/pay-rent', payRentHandler);
+router.get('/:gameId/play', requireAuth, renderGameHandler);
 
 export default router; 

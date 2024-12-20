@@ -1,17 +1,20 @@
-import { Pool } from 'pg';
 import { GameEvent, GameStatistics } from '../../shared/types';
+import { databaseService } from './databaseService';
 
 class GameHistoryService {
-  private pool: Pool;
+  private static instance: GameHistoryService | null = null;
 
-  constructor() {
-    this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL
-    });
+  private constructor() {}
+
+  static getInstance(): GameHistoryService {
+    if (!GameHistoryService.instance) {
+      GameHistoryService.instance = new GameHistoryService();
+    }
+    return GameHistoryService.instance;
   }
 
   async addEvent(gameId: number, event: GameEvent): Promise<void> {
-    await this.pool.query(
+    await databaseService.getPool().query(
       'INSERT INTO game_events (game_id, type, player_id, related_player_id, property_id, amount, position, description, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
       [
         gameId,
@@ -22,14 +25,14 @@ class GameHistoryService {
         event.amount,
         event.position,
         event.description,
-        event.metadata
+        event.metadata || '{}'
       ]
     );
   }
 
   async getGameEvents(gameId: number): Promise<GameEvent[]> {
-    const result = await this.pool.query(
-      'SELECT * FROM game_events WHERE game_id = $1 ORDER BY timestamp ASC',
+    const result = await databaseService.getPool().query(
+      'SELECT type, description, player_id as "playerId", property_id as "propertyId", related_player_id as "relatedPlayerId", amount, position, timestamp FROM game_events WHERE game_id = $1 ORDER BY timestamp ASC',
       [gameId]
     );
     return result.rows;
@@ -37,7 +40,7 @@ class GameHistoryService {
 
   async getGameStatistics(gameId: number): Promise<GameStatistics> {
     const events = await this.getGameEvents(gameId);
-    const result = await this.pool.query(
+    const result = await databaseService.getPool().query(
       'SELECT * FROM game_statistics WHERE game_id = $1',
       [gameId]
     );
@@ -58,8 +61,8 @@ class GameHistoryService {
     };
   }
 
-  private async getPlayerStatistics(gameId: number): Promise<any[]> {
-    const result = await this.pool.query(
+  async getPlayerStatistics(gameId: number): Promise<any[]> {
+    const result = await databaseService.getPool().query(
       'SELECT * FROM player_statistics WHERE game_id = $1',
       [gameId]
     );
@@ -67,7 +70,7 @@ class GameHistoryService {
   }
 
   private async getTradeStatistics(gameId: number): Promise<any[]> {
-    const result = await this.pool.query(
+    const result = await databaseService.getPool().query(
       'SELECT * FROM trade_statistics WHERE game_id = $1',
       [gameId]
     );
@@ -75,12 +78,23 @@ class GameHistoryService {
   }
 
   private async getPropertyStatistics(gameId: number): Promise<any[]> {
-    const result = await this.pool.query(
+    const result = await databaseService.getPool().query(
       'SELECT * FROM property_statistics WHERE game_id = $1',
       [gameId]
     );
     return result.rows || [];
   }
+
+  async leaveGame(gameId: number, playerId: number): Promise<void> {
+    await this.addEvent(gameId, {
+      type: 'custom',
+      playerId,
+      description: 'Player left the game',
+      timestamp: Date.now()
+    });
+    await databaseService.leaveGame(gameId, playerId);
+  }
 }
 
-export const gameHistoryService = new GameHistoryService(); 
+// Export a singleton instance
+export const gameHistoryService = GameHistoryService.getInstance(); 

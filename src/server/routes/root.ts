@@ -1,9 +1,11 @@
-import express from "express";
+import express, { RequestHandler } from 'express';
 
 const router = express.Router();
 
-router.get("/", (_request, response) => {
-    response.render("root", { title: "Jrob's site" });
-});
+const getRootHandler: RequestHandler = (_req, res) => {
+    res.render('index');
+};
+
+router.get('/', getRootHandler);
 
 export default router;

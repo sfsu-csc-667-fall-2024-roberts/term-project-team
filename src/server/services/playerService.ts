@@ -1,81 +1,107 @@
 import { Player } from '../../shared/types';
-import { Pool } from 'pg';
+import { DatabaseService } from './databaseService';
 
 export class PlayerService {
-  private pool: Pool;
-  private gameId: number;
+    private static instance: PlayerService;
+    private databaseService: DatabaseService;
 
-  constructor(gameId: number) {
-    this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL
-    });
-    this.gameId = gameId;
-  }
+    private constructor() {
+        this.databaseService = DatabaseService.getInstance();
+    }
 
-  public async getPlayers(): Promise<Player[]> {
-    const players = await this.pool.query(
-      'SELECT * FROM players WHERE game_id = $1 ORDER BY turn_order',
-      [this.gameId]
-    );
-    return players.rows;
-  }
+    public static getInstance(): PlayerService {
+        if (!PlayerService.instance) {
+            PlayerService.instance = new PlayerService();
+        }
+        return PlayerService.instance;
+    }
 
-  public async getActivePlayers(): Promise<Player[]> {
-    const players = await this.pool.query(
-      'SELECT * FROM players WHERE game_id = $1 AND is_bankrupt = false ORDER BY turn_order',
-      [this.gameId]
-    );
-    return players.rows;
-  }
+    async getPlayer(playerId: number): Promise<Player | null> {
+        return await this.databaseService.getPlayer(playerId);
+    }
 
-  public async updatePlayerPosition(playerId: number, position: number): Promise<void> {
-    await this.pool.query(
-      'UPDATE players SET position = $1 WHERE id = $2 AND game_id = $3',
-      [position, playerId, this.gameId]
-    );
-  }
+    async getPlayerByUserId(userId: number): Promise<Player | null> {
+        const result = await this.databaseService.query(
+            'SELECT p.* FROM players p WHERE p.user_id = $1',
+            [userId]
+        );
+        return result.rows[0] || null;
+    }
 
-  public async updatePlayerMoney(playerId: number, amount: number): Promise<void> {
-    await this.pool.query(
-      'UPDATE players SET money = money + $1 WHERE id = $2 AND game_id = $3',
-      [amount, playerId, this.gameId]
-    );
-  }
+    async getPlayersInGame(gameId: number): Promise<Player[]> {
+        return await this.databaseService.getGamePlayers(gameId);
+    }
 
-  public async getPlayerById(playerId: number): Promise<Player | null> {
-    const result = await this.pool.query(
-      'SELECT * FROM players WHERE id = $1 AND game_id = $2',
-      [playerId, this.gameId]
-    );
-    return result.rows[0] || null;
-  }
+    async updatePlayer(playerId: number, updates: Partial<Player>, gameId?: number): Promise<void> {
+        await this.databaseService.updatePlayer(playerId, updates, gameId);
+    }
 
-  public async setPlayerJailStatus(playerId: number, inJail: boolean): Promise<void> {
-    await this.pool.query(
-      'UPDATE players SET in_jail = $1 WHERE id = $2 AND game_id = $3',
-      [inJail, playerId, this.gameId]
-    );
-  }
+    async updatePlayerPosition(playerId: number, position: number, gameId: number): Promise<void> {
+        await this.databaseService.updatePlayerPosition(gameId, playerId, position);
+    }
 
-  public async updatePlayerTurn(currentPlayerId: number): Promise<number> {
-    const players = await this.getActivePlayers();
-    const currentIndex = players.findIndex(p => p.id === currentPlayerId);
-    const nextIndex = (currentIndex + 1) % players.length;
-    const nextPlayerId = players[nextIndex].id;
+    async updatePlayerMoney(playerId: number, money: number, gameId: number): Promise<void> {
+        await this.databaseService.updatePlayer(playerId, { money }, gameId);
+    }
 
-    await this.pool.query(
-      'UPDATE games SET current_player_id = $1 WHERE id = $2',
-      [nextPlayerId, this.gameId]
-    );
+    async sendToJail(gameId: number, playerId: number): Promise<void> {
+        await this.updatePlayer(playerId, {
+            isJailed: true,
+            position: 10, // Jail position
+            turnsInJail: 0
+        }, gameId);
+    }
 
-    return nextPlayerId;
-  }
+    async releaseFromJail(playerId: number, gameId: number): Promise<void> {
+        await this.updatePlayer(playerId, {
+            isJailed: false,
+            turnsInJail: 0
+        }, gameId);
+    }
 
-  public async isPlayerTurn(playerId: number): Promise<boolean> {
-    const game = await this.pool.query(
-      'SELECT current_player_id FROM games WHERE id = $1',
-      [this.gameId]
-    );
-    return game.rows[0].current_player_id === playerId;
-  }
-} 
+    async payRent(fromPlayerId: number, toPlayerId: number, amount: number, gameId: number): Promise<boolean> {
+        const fromPlayer = await this.getPlayer(fromPlayerId);
+        const toPlayer = await this.getPlayer(toPlayerId);
+
+        if (!fromPlayer || !toPlayer || fromPlayer.money < amount) {
+            return false;
+        }
+
+        await this.updatePlayerMoney(fromPlayerId, fromPlayer.money - amount, gameId);
+        await this.updatePlayerMoney(toPlayerId, toPlayer.money + amount, gameId);
+        return true;
+    }
+
+    async jailPlayer(playerId: number, gameId: number): Promise<void> {
+        await this.sendToJail(gameId, playerId);
+    }
+
+    async declareBankruptcy(playerId: number, gameId: number, creditorId?: number): Promise<void> {
+        const player = await this.getPlayer(playerId);
+        if (!player) return;
+
+        // Update player status
+        await this.updatePlayer(playerId, {
+            isBankrupt: true,
+            money: 0
+        }, gameId);
+
+        // If there's a creditor, transfer all properties
+        if (creditorId) {
+            const properties = await this.databaseService.getGameProperties(gameId);
+            const playerProperties = properties.filter(p => p.ownerId === playerId);
+
+            for (const property of playerProperties) {
+                await this.databaseService.updateProperty(property.id, {
+                    ownerId: creditorId
+                });
+            }
+        }
+    }
+
+    async getPlayerById(playerId: number): Promise<Player | null> {
+        return await this.databaseService.getPlayer(playerId);
+    }
+}
+
+export const playerService = PlayerService.getInstance(); 

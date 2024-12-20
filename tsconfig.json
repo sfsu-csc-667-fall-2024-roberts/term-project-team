@@ -22,7 +22,9 @@
       "node",
       "express",
       "express-session"
-    ]
+    ],
+    "strictNullChecks": false,
+    "noImplicitAny": false
   },
   "include": [
     "src/**/*"

@@ -1,5 +1,18 @@
 import { ExtendedBoardSpace } from './types';
 
+const COLOR_GROUPS = {
+  brown: '#955436',
+  lightblue: '#AAE0FA',
+  pink: '#D93A96',
+  orange: '#F7941D',
+  red: '#ED1B24',
+  yellow: '#FEF200',
+  green: '#1FB25A',
+  blue: '#0072BB',
+  railroad: '#000000',
+  utility: '#808080'
+};
+
 export const BOARD_SPACES: ExtendedBoardSpace[] = [
   {
     position: 0,
@@ -15,7 +28,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 50,
     hotelCost: 50,
     mortgageValue: 30,
-    colorGroup: 'brown'
+    colorGroup: 'brown',
+    color: COLOR_GROUPS.brown
   },
   {
     position: 2,
@@ -31,7 +45,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 50,
     hotelCost: 50,
     mortgageValue: 30,
-    colorGroup: 'brown'
+    colorGroup: 'brown',
+    color: COLOR_GROUPS.brown
   },
   {
     position: 4,
@@ -45,6 +60,7 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'railroad',
     price: 200,
     rentLevels: [25, 50, 100, 200],
+    color: COLOR_GROUPS.railroad
   },
   {
     position: 6,
@@ -55,7 +71,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 50,
     hotelCost: 50,
     mortgageValue: 50,
-    colorGroup: 'lightblue'
+    colorGroup: 'lightblue',
+    color: COLOR_GROUPS.lightblue
   },
   {
     position: 7,
@@ -71,7 +88,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 50,
     hotelCost: 50,
     mortgageValue: 50,
-    colorGroup: 'lightblue'
+    colorGroup: 'lightblue',
+    color: COLOR_GROUPS.lightblue
   },
   {
     position: 9,
@@ -82,7 +100,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 50,
     hotelCost: 50,
     mortgageValue: 60,
-    colorGroup: 'lightblue'
+    colorGroup: 'lightblue',
+    color: COLOR_GROUPS.lightblue
   },
   {
     position: 10,
@@ -98,7 +117,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 100,
     hotelCost: 100,
     mortgageValue: 70,
-    colorGroup: 'pink'
+    colorGroup: 'pink',
+    color: COLOR_GROUPS.pink
   },
   {
     position: 12,
@@ -106,6 +126,7 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'utility',
     price: 150,
     rentLevels: [4, 10],
+    color: COLOR_GROUPS.utility
   },
   {
     position: 13,
@@ -116,7 +137,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 100,
     hotelCost: 100,
     mortgageValue: 70,
-    colorGroup: 'pink'
+    colorGroup: 'pink',
+    color: COLOR_GROUPS.pink
   },
   {
     position: 14,
@@ -127,7 +149,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 100,
     hotelCost: 100,
     mortgageValue: 80,
-    colorGroup: 'pink'
+    colorGroup: 'pink',
+    color: COLOR_GROUPS.pink
   },
   {
     position: 15,
@@ -135,6 +158,7 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'railroad',
     price: 200,
     rentLevels: [25, 50, 100, 200],
+    color: COLOR_GROUPS.railroad
   },
   {
     position: 16,
@@ -145,7 +169,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 100,
     hotelCost: 100,
     mortgageValue: 90,
-    colorGroup: 'orange'
+    colorGroup: 'orange',
+    color: COLOR_GROUPS.orange
   },
   {
     position: 17,
@@ -161,7 +186,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 100,
     hotelCost: 100,
     mortgageValue: 90,
-    colorGroup: 'orange'
+    colorGroup: 'orange',
+    color: COLOR_GROUPS.orange
   },
   {
     position: 19,
@@ -172,7 +198,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 100,
     hotelCost: 100,
     mortgageValue: 100,
-    colorGroup: 'orange'
+    colorGroup: 'orange',
+    color: COLOR_GROUPS.orange
   },
   {
     position: 20,
@@ -188,7 +215,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 150,
     hotelCost: 150,
     mortgageValue: 110,
-    colorGroup: 'red'
+    colorGroup: 'red',
+    color: COLOR_GROUPS.red
   },
   {
     position: 22,
@@ -204,7 +232,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 150,
     hotelCost: 150,
     mortgageValue: 110,
-    colorGroup: 'red'
+    colorGroup: 'red',
+    color: COLOR_GROUPS.red
   },
   {
     position: 24,
@@ -215,7 +244,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 150,
     hotelCost: 150,
     mortgageValue: 120,
-    colorGroup: 'red'
+    colorGroup: 'red',
+    color: COLOR_GROUPS.red
   },
   {
     position: 25,
@@ -223,6 +253,7 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'railroad',
     price: 200,
     rentLevels: [25, 50, 100, 200],
+    color: COLOR_GROUPS.railroad
   },
   {
     position: 26,
@@ -233,7 +264,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 150,
     hotelCost: 150,
     mortgageValue: 130,
-    colorGroup: 'yellow'
+    colorGroup: 'yellow',
+    color: COLOR_GROUPS.yellow
   },
   {
     position: 27,
@@ -244,7 +276,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 150,
     hotelCost: 150,
     mortgageValue: 130,
-    colorGroup: 'yellow'
+    colorGroup: 'yellow',
+    color: COLOR_GROUPS.yellow
   },
   {
     position: 28,
@@ -252,6 +285,7 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'utility',
     price: 150,
     rentLevels: [4, 10],
+    color: COLOR_GROUPS.utility
   },
   {
     position: 29,
@@ -262,7 +296,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 150,
     hotelCost: 150,
     mortgageValue: 140,
-    colorGroup: 'yellow'
+    colorGroup: 'yellow',
+    color: COLOR_GROUPS.yellow
   },
   {
     position: 30,
@@ -278,7 +313,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 200,
     hotelCost: 200,
     mortgageValue: 150,
-    colorGroup: 'green'
+    colorGroup: 'green',
+    color: COLOR_GROUPS.green
   },
   {
     position: 32,
@@ -289,7 +325,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 200,
     hotelCost: 200,
     mortgageValue: 150,
-    colorGroup: 'green'
+    colorGroup: 'green',
+    color: COLOR_GROUPS.green
   },
   {
     position: 33,
@@ -305,7 +342,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 200,
     hotelCost: 200,
     mortgageValue: 160,
-    colorGroup: 'green'
+    colorGroup: 'green',
+    color: COLOR_GROUPS.green
   },
   {
     position: 35,
@@ -313,6 +351,7 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     type: 'railroad',
     price: 200,
     rentLevels: [25, 50, 100, 200],
+    color: COLOR_GROUPS.railroad
   },
   {
     position: 36,
@@ -328,7 +367,8 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 200,
     hotelCost: 200,
     mortgageValue: 175,
-    colorGroup: 'blue'
+    colorGroup: 'blue',
+    color: COLOR_GROUPS.blue
   },
   {
     position: 38,
@@ -345,6 +385,7 @@ export const BOARD_SPACES: ExtendedBoardSpace[] = [
     houseCost: 200,
     hotelCost: 200,
     mortgageValue: 200,
-    colorGroup: 'blue'
+    colorGroup: 'blue',
+    color: COLOR_GROUPS.blue
   }
 ]; 

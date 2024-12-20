@@ -1,73 +1,31 @@
-import bcrypt from "bcrypt";
-import { pool } from "../config";
-import { REGISTER_SQL, FIND_BY_USERNAME_SQL } from "./sql";
+import { Pool } from 'pg';
+import { pool } from '../config';
 
-type User = {
-  id: number;
-  username: string;
-};
+export interface User {
+    id: number;
+    username: string;
+    email: string;
+    password: string;
+}
 
-type UserWithPassword = User & {
-  hashed_password: string;
-};
-
-const register = async (
-  username: string,
-  clearTextPassword: string
-): Promise<User> => {
-  try {
-    // Check if username already exists
-    const existingUser = await findByUsername(username);
-    if (existingUser) {
-      throw new Error("Username already taken");
+export class Users {
+    static async create(username: string, email: string, hashedPassword: string): Promise<User> {
+        const result = await pool.query(
+            'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING *',
+            [username, email, hashedPassword]
+        );
+        return result.rows[0];
     }
 
-    // Hash password and create user
-    const hashedPassword = await bcrypt.hash(clearTextPassword, 10);
-    const result = await pool.query(REGISTER_SQL, [username, hashedPassword]);
-    
-    console.log('User registered:', { username, userId: result.rows[0].id });
-    return result.rows[0];
-  } catch (error) {
-    console.error('Registration error:', error);
-    throw error;
-  }
-};
-
-const login = async (username: string, clearTextPassword: string): Promise<User> => {
-  try {
-    // Find user by username
-    const user = await findByUsername(username);
-    if (!user) {
-      console.error('Login failed: User not found:', username);
-      throw new Error("Invalid username or password");
+    static async findByEmail(email: string): Promise<User | null> {
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        return result.rows[0] || null;
     }
 
-    // Verify password
-    const isValid = await bcrypt.compare(clearTextPassword, user.hashed_password);
-    if (!isValid) {
-      console.error('Login failed: Invalid password for user:', username);
-      throw new Error("Invalid username or password");
+    static async findById(id: number): Promise<User | null> {
+        const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+        return result.rows[0] || null;
     }
+}
 
-    // Return user without password
-    const { hashed_password, ...userWithoutPassword } = user;
-    console.log('User logged in:', { username, userId: user.id });
-    return userWithoutPassword;
-  } catch (error) {
-    console.error('Login error:', error);
-    throw error;
-  }
-};
-
-const findByUsername = async (username: string): Promise<UserWithPassword | null> => {
-  try {
-    const result = await pool.query(FIND_BY_USERNAME_SQL, [username]);
-    return result.rows[0] || null;
-  } catch (error) {
-    console.error('Error finding user:', error);
-    throw error;
-  }
-};
-
-export default { register, login, findByUsername };
+export default Users;

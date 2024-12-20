@@ -1,194 +1,175 @@
 import express from 'express';
-import session from 'express-session';
 import path from 'path';
-import livereload from 'livereload';
-import connectLivereload from 'connect-livereload';
-import { pool } from './db/config';
-import authRoutes from './routes/auth';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import { setupWebSocket } from './websocket/index';
 import gameRoutes from './routes/game';
+import propertyRoutes from './routes/property';
 import lobbyRoutes from './routes/lobby';
-import { addUserToLocals } from './middleware';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import net from 'net';
-import pgSession from 'connect-pg-simple';
-
-const execAsync = promisify(exec);
-const LIVERELOAD_PORT = 35729;
+import authRoutes from './routes/auth';
+import { addUserToLocals } from './middleware/auth';
+import { DatabaseService } from './services/databaseService';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-// Initialize PostgreSQL session store
-const PostgresqlStore = pgSession(session);
-
-// Configure session middleware with PostgreSQL store
-app.use(session({
-  store: new PostgresqlStore({
-    pool,
-    tableName: 'user_sessions',   // Table to store sessions
-    createTableIfMissing: true,   // Auto-create sessions table
-    pruneSessionInterval: 60      // Cleanup old sessions every 60 seconds
-  }),
-  secret: process.env.JWT_SECRET || 'your_secret_key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    httpOnly: true,
-    sameSite: 'lax'
-  },
-  name: 'monopoly.sid', // custom session cookie name
-  rolling: true // Refresh session with each request
-}));
-
-// Check if a port is in use
-async function isPortInUse(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const tester = net.createServer()
-      .once('error', () => resolve(true))
-      .once('listening', () => {
-        tester.once('close', () => resolve(false)).close();
-      })
-      .listen(port);
-  });
-}
-
-// Kill existing LiveReload processes
-async function cleanupLiveReload(): Promise<void> {
-  try {
-    console.log('Checking for existing LiveReload processes...');
-    
-    if (await isPortInUse(LIVERELOAD_PORT)) {
-      console.log(`Port ${LIVERELOAD_PORT} is in use, cleaning up...`);
-      try {
-        const { stdout } = await execAsync(`lsof -i :${LIVERELOAD_PORT}`);
-        const lines = stdout.split('\n');
-        
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line) {
-            const parts = line.split(/\s+/);
-            if (parts.length >= 2) {
-              const pid = parts[1];
-              try {
-                await execAsync(`kill -9 ${pid}`);
-                console.log(`Killed process ${pid}`);
-              } catch (error) {
-                console.log(`Failed to kill process ${pid}:`, error);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.log('No processes found to kill');
-      }
-      
-      // Wait a bit for the port to be released
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } else {
-      console.log('LiveReload port is available');
-    }
-  } catch (error) {
-    console.error('Error during LiveReload cleanup:', error);
-  }
-}
-
-// Initialize LiveReload server with retries
-async function initializeLiveReload(retries = 3): Promise<void> {
-  for (let i = 0; i < retries; i++) {
+// Initialize database
+const initializeApp = async () => {
+    let server;
     try {
-      await cleanupLiveReload();
-      
-      if (await isPortInUse(LIVERELOAD_PORT)) {
-        console.log(`Port ${LIVERELOAD_PORT} still in use after cleanup, retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        continue;
-      }
+        console.log('\n=== Starting Server Initialization ===');
+        
+        // Initialize database connection
+        console.log('\nStep 1: Creating database service instance...');
+        const dbService = DatabaseService.getInstance();
+        console.log('Database service instance created successfully');
+        
+        console.log('\nStep 2: Initializing database connection...');
+        await dbService.initialize();
+        console.log('Database initialized successfully');
 
-      const liveReloadServer = livereload.createServer({
-        port: LIVERELOAD_PORT,
-        exts: ['js', 'css', 'ejs'],
-        debug: true
-      });
+        // Middleware setup
+        console.log('\nStep 3: Setting up middleware...');
+        app.use(cors({
+            origin: 'http://localhost:3000',
+            credentials: true
+        }));
+        console.log('CORS middleware set up successfully');
 
-      liveReloadServer.watch([
-        path.join(process.cwd(), 'public'),
-        path.join(process.cwd(), 'src/server/views')
-      ]);
+        // Body parsing middleware
+        console.log('\nStep 4: Setting up body parsing middleware...');
+        app.use(express.json());
+        app.use(express.urlencoded({ extended: true }));
+        app.use(cookieParser());
+        console.log('Basic middleware set up successfully');
 
-      liveReloadServer.server.once("connection", () => {
-        setTimeout(() => {
-          liveReloadServer.refresh("/");
-        }, 100);
-      });
+        // Session middleware
+        console.log('\nStep 5: Setting up session middleware...');
+        app.use(session({
+            secret: process.env.SESSION_SECRET || 'your-secret-key',
+            resave: false,
+            saveUninitialized: false,
+            cookie: {
+                secure: process.env.NODE_ENV === 'production',
+                httpOnly: true,
+                maxAge: 24 * 60 * 60 * 1000 // 24 hours
+            }
+        }));
+        console.log('Session middleware set up successfully');
 
-      // Add LiveReload middleware
-      app.use(connectLivereload());
-      console.log('LiveReload server started successfully');
-      return;
+        // Add user to locals middleware
+        console.log('\nStep 6: Setting up user locals middleware...');
+        app.use(addUserToLocals);
+        console.log('User locals middleware set up successfully');
+
+        // Set view engine
+        console.log('\nStep 7: Setting up view engine...');
+        app.set('views', path.join(__dirname, 'views'));
+        app.set('view engine', 'ejs');
+        console.log('View engine set up successfully');
+
+        // Static files
+        console.log('\nStep 8: Setting up static file serving...');
+        app.use('/dist', express.static(path.join(__dirname, '../../dist'), {
+            setHeaders: (res, path) => {
+                if (path.endsWith('.css')) {
+                    res.setHeader('Content-Type', 'text/css');
+                }
+            }
+        }));
+        app.use(express.static(path.join(__dirname, '../public')));
+        console.log('Static file serving set up successfully');
+
+        // Routes
+        console.log('\nStep 9: Setting up routes...');
+        app.use('/auth', authRoutes);
+        app.use('/game', gameRoutes);
+        app.use('/property', propertyRoutes);
+        app.use('/lobby', lobbyRoutes);
+        console.log('Routes set up successfully');
+
+        // Root route
+        app.get('/', (req, res) => {
+            console.log('Root route accessed, user:', res.locals.user);
+            const user = res.locals.user;
+            if (user) {
+                res.redirect('/lobby');
+            } else {
+                res.redirect('/auth/login');
+            }
+        });
+
+        // Error handling middleware
+        console.log('\nStep 10: Setting up error handling...');
+        app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+            console.error('Error:', err);
+            res.status(err.status || 500).render('error', {
+                message: err.message || 'An unexpected error occurred',
+                error: process.env.NODE_ENV === 'development' ? err : {}
+            });
+        });
+        console.log('Error handling set up successfully');
+
+        // Start server
+        console.log('\nStep 11: Starting server...');
+        server = app.listen(port, () => {
+            console.log(`\n=== Server is running on http://localhost:${port} ===\n`);
+        });
+
+        // Setup WebSocket
+        console.log('\nStep 12: Setting up WebSocket...');
+        setupWebSocket(server);
+        console.log('WebSocket server initialized successfully');
+
+        // Handle WebSocket upgrade requests
+        server.on('upgrade', (request, socket, head) => {
+            const url = new URL(request.url!, `http://${request.headers.host}`);
+            console.log('WebSocket upgrade request for URL:', url.pathname);
+            
+            if (url.pathname.startsWith('/ws/game/')) {
+                socket.on('error', (error) => {
+                    console.error('WebSocket upgrade error:', error);
+                    socket.destroy();
+                });
+            }
+        });
+
+        console.log('\n=== Application initialization completed successfully ===\n');
+
+        // Handle server errors
+        server.on('error', (error: any) => {
+            console.error('\nServer error:', error);
+            if (error.code === 'EADDRINUSE') {
+                console.error(`Port ${port} is already in use`);
+                process.exit(1);
+            }
+        });
+
+        return server;
     } catch (error) {
-      console.error(`LiveReload initialization attempt ${i + 1} failed:`, error);
-      if (i === retries - 1) {
-        console.error('Failed to initialize LiveReload after all retries');
-      }
+        console.error('\nFailed to initialize application:', error);
+        if (server) {
+            server.close();
+        }
+        process.exit(1);
     }
-  }
-}
+};
 
-// Initialize LiveReload
-initializeLiveReload().catch(error => {
-  console.error('Failed to initialize LiveReload:', error);
+// Start the application with error handling
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.exit(1);
 });
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(process.cwd(), 'public')));
-
-// Add Content Security Policy headers
-app.use((req, res, next) => {
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:35729 https://localhost:35729; connect-src 'self' ws://localhost:35729 wss://localhost:35729; style-src 'self' 'unsafe-inline';"
-  );
-  next();
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    process.exit(1);
 });
 
-// Add user data to locals
-app.use(addUserToLocals);
-
-// View engine setup
-app.set('view engine', 'ejs');
-app.set('views', path.join(process.cwd(), 'src', 'server', 'views'));
-
-// Root route - redirect to lobby or login
-app.get('/', (req, res) => {
-  const session = req.session as session.Session & { userId?: number };
-  if (session.userId) {
-    res.redirect('/lobby');
-  } else {
-    res.redirect('/login');
-  }
+initializeApp().catch(error => {
+    console.error('Failed to start application:', error);
+    process.exit(1);
 });
 
-// Routes
-app.use(authRoutes);
-app.use('/games', gameRoutes);
-app.use('/lobby', lobbyRoutes);
-
-// Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
-  res.status(err.status || 500);
-  res.render('error', {
-    message: err.message,
-    error: process.env.NODE_ENV === 'development' ? err : {}
-  });
-});
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+export default app;

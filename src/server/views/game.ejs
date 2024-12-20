@@ -3,326 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monopoly Online</title>
-    <link rel="stylesheet" href="/dist/styles.css">
+    <title>Monopoly Game</title>
+    <link rel="stylesheet" type="text/css" href="/dist/css/styles.css">
 </head>
 <body>
-  <div class="game-container">
-    <!-- Main Header -->
-    <header class="game-header">
-      <div class="header-left">
-        <h1 class="game-title">Monopoly Online</h1>
-        <span class="game-id">Game #<%= game.id %></span>
-        <button class="header-action-button view-rules-button" id="view-rules">View Rules</button>
-      </div>
-      
-      <div class="header-center">
-        <div class="game-status-wrapper">
-          <div class="game-status" title="Click to view game history">
-            <% if (gameState && gameState.phase === 'waiting') { %>
-              <% const playersWhoHaveNotRolled = players.filter(p => !gameState.diceRolls.find(r => r.id === p.id)); %>
-              <% const nextToRoll = playersWhoHaveNotRolled[0]; %>
-              <% if (nextToRoll) { %>
-                Initial Roll Phase - Waiting for <%= nextToRoll.username %><%= nextToRoll.isBot ? ' 🤖' : '' %> to roll
-                (<%= (gameState.diceRolls || []).length %>/<%= players.length %> players rolled)
-              <% } else { %>
-                Initial Roll Phase - All players have rolled
-              <% } %>
-            <% } else if (gameState && gameState.phase === 'playing') { %>
-              <% const currentPlayer = players.find(p => p.id === (gameState.turnOrder || [])[gameState.currentPlayerIndex]); %>
-              <%= currentPlayer ? `${currentPlayer.username}${currentPlayer.isBot ? ' 🤖' : ''}'s Turn` : 'Loading...' %>
-              <% if (currentPlayer && currentPlayer.id === currentPlayerId) { %>
-                - Your turn!
-              <% } %>
-            <% } else { %>
-              <%= game.status || 'Loading...' %>
-            <% } %>
-          </div>
-        </div>
-      </div>
-      
-      <div class="header-right">
-        <button class="header-action-button danger end-game-button" id="end-game">End Game</button>
-        <div class="user-info">
-          Welcome, <%= username %>
-          <a href="/logout" class="logout-link">Logout</a>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Game Content -->
-    <main class="game-content">
-      <!-- Players Section -->
-      <section class="players-section">
-        <header class="panel-header">
-          <h2 class="panel-title">Players</h2>
+    <div class="game-container">
+        <header class="game-header">
+            <div class="header-left">
+                <h1 class="game-title">Monopoly</h1>
+                <div class="game-id">Game #<%= gameId %></div>
+                <div class="game-status" id="game-status">
+                    <%= gameState.gamePhase === 'ROLL' ? 'Waiting for roll...' : 
+                       gameState.gamePhase === 'ACTION' ? 'Taking action...' :
+                       gameState.gamePhase === 'END_TURN' ? 'Ending turn...' :
+                       gameState.gamePhase === 'GAME_OVER' ? 'Game Over!' : 'Waiting for players...' %>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="user-info">
+                    <span>Playing as: <%= username %></span>
+                </div>
+                <div class="header-actions">
+                    <button id="show-rules" class="header-action-button view-rules-button">Rules</button>
+                    <button id="end-game" class="header-action-button danger end-game-button">End Game</button>
+                </div>
+            </div>
         </header>
-        <div class="panel-content">
-          <div class="players-list">
-            <% const sortedPlayers = players.sort((a, b) => { %>
-            <%   if (a.is_bot === b.is_bot) return 0; %>
-            <%   return a.is_bot ? 1 : -1; %>
-            <% }); %>
-            
-            <% sortedPlayers.forEach((player) => { %>
-              <div class="player-card <%= player.id === currentPlayerId ? 'current-player' : '' %>"
-                   data-player-id="<%= player.id %>">
-                <div class="player-avatar">
-                  <%= player.is_bot ? '🤖' : '👤' %>
+
+        <div class="game-content">
+            <section class="players-section">
+                <div class="panel-header">
+                    <h2 class="panel-title">Players</h2>
                 </div>
-                <div class="player-info">
-                  <div class="player-name">
-                    <%= player.username %>
-                    <% if (player.id === currentPlayerId) { %>
-                      <span class="player-you">(You)</span>
-                    <% } %>
-                  </div>
-                  <div class="player-stats">
-                    <div class="player-balance">$<%= player.money %></div>
-                    <div class="player-position">
-                      <% if (gameState.phase === 'playing') { %>
-                        Position: <%= player.position %>
-                      <% } %>
-                    </div>
-                    <div class="roll-status">
-                      <% if (gameState.phase === 'waiting') { %>
-                        <% const playerRoll = gameState.diceRolls.find(r => r.id === player.id); %>
-                        <%= playerRoll ? `Rolled: ${playerRoll.roll}` : 'Waiting for roll...' %>
-                      <% } else { %>
-                        <% if (gameState.turnOrder && gameState.turnOrder[gameState.currentPlayerIndex] === player.id) { %>
-                          Current turn
-                        <% } else { %>
-                          Waiting...
-                        <% } %>
-                      <% } %>
-                    </div>
-                  </div>
-                  <% if (!player.is_bot && player.user_id === currentUserId) { %>
-                    <div class="player-controls">
-                      <button id="roll-dice" class="btn btn-primary <%= (gameState.phase === 'waiting' && !gameState.diceRolls.find(r => r.id === player.id)) || (gameState.phase === 'playing' && gameState.currentPlayerId === player.id && !gameState.lastRoll) ? 'active' : '' %>"
-                        <%= (gameState.phase === 'waiting' && !gameState.diceRolls.find(r => r.id === player.id)) || (gameState.phase === 'playing' && gameState.currentPlayerId === player.id && !gameState.lastRoll) ? '' : 'disabled' %>>
-                        Roll Dice
-                      </button>
-                      <button id="end-turn" class="btn btn-secondary <%= gameState.phase === 'playing' && gameState.currentPlayerId === player.id && gameState.lastRoll ? 'active' : '' %>"
-                        <%= gameState.phase === 'playing' && gameState.currentPlayerId === player.id && gameState.lastRoll ? '' : 'disabled' %>>
-                        End Turn
-                      </button>
-                    </div>
-                  <% } %>
+                <div class="panel-content" id="players-list">
+                    <!-- Players will be rendered here by the UIManager -->
                 </div>
-              </div>
-            <% }); %>
-          </div>
-        </div>
-      </section>
-
-      <!-- Game Board -->
-      <section class="game-board-wrapper">
-        <div class="game-board">
-          <div id="monopoly-board"></div>
-        </div>
-      </section>
-
-      <!-- Properties Section -->
-      <section class="properties-section">
-        <header class="panel-header">
-          <h2 class="panel-title">Properties</h2>
-        </header>
-        <div class="panel-content">
-          <div class="tab-buttons">
-            <button class="tab-button active" data-tab="available">Available</button>
-            <button class="tab-button" data-tab="yours">Your Properties</button>
-            <button class="tab-button" data-tab="owned">Other Players</button>
-          </div>
-          <div class="tab-content">
-            <div class="tab-pane active" id="available">
-              <div class="properties-list">
-                <% const availableProps = properties.filter(p => !p.ownerId); %>
-                <% const groupedProperties = availableProps.reduce((acc, prop) => {
-                  if (prop.colorGroup) {
-                    if (!acc[prop.colorGroup]) {
-                      acc[prop.colorGroup] = [];
-                    }
-                    acc[prop.colorGroup].push(prop);
-                  }
-                  return acc;
-                }, {}); %>
-
-                <% Object.entries(groupedProperties).forEach(([colorGroup, props]) => { %>
-                  <div class="property-group" data-color-group="<%= colorGroup %>">
-                    <h3 class="group-title"><%= colorGroup.charAt(0).toUpperCase() + colorGroup.slice(1) %></h3>
-                    <div class="group-properties">
-                      <% props.forEach((property) => { %>
-                        <div class="property-card" data-property-id="<%= property.id %>">
-                          <div class="color-strip" style="background-color: <%= property.colorGroup %>"></div>
-                          <div class="property-name"><%= property.name %></div>
-                          <div class="property-price">$<%= property.price %></div>
-                          <div class="property-rent">Rent: $<%= property.rent_levels[0] %></div>
-                        </div>
-                      <% }); %>
-                    </div>
-                  </div>
-                <% }); %>
-
-                <!-- Special Properties (Railroads and Utilities) -->
-                <div class="special-properties">
-                  <h3>Railroads & Utilities</h3>
-                  <div class="group-properties">
-                    <% properties.filter(p => !p.colorGroup && !p.ownerId).forEach((property) => { %>
-                      <div class="property-card <%= property.type %>" data-property-id="<%= property.id %>">
-                        <div class="property-name"><%= property.name %></div>
-                        <div class="property-price">$<%= property.price %></div>
-                        <div class="property-rent">Rent: $<%= property.rent_levels[0] %></div>
-                      </div>
-                    <% }); %>
-                  </div>
+                <div class="game-controls">
+                    <button id="roll-dice" class="btn btn-primary" disabled>Roll Dice</button>
+                    <button id="end-turn" class="btn btn-secondary" disabled>End Turn</button>
                 </div>
-              </div>
+                <div id="game-log" class="game-log">
+                    <div class="game-log-header">Game Log</div>
+                    <div class="game-log-content"></div>
+                </div>
+            </section>
+
+            <div class="game-board-wrapper">
+                <div class="game-board">
+                    <div id="monopoly-board" class="board-wrapper">
+                        <!-- Board will be rendered here by the UIManager -->
+                    </div>
+                </div>
+                <div class="dice-container" id="dice-container">
+                    <div class="dice" id="dice1">1</div>
+                    <div class="dice" id="dice2">1</div>
+                </div>
             </div>
 
-            <div class="tab-pane" id="yours">
-              <div class="properties-list">
-                <% const yourProps = properties.filter(p => p.ownerId === currentPlayerId); %>
-                <% const groupedYourProps = yourProps.reduce((acc, prop) => {
-                  if (prop.colorGroup) {
-                    if (!acc[prop.colorGroup]) {
-                      acc[prop.colorGroup] = [];
-                    }
-                    acc[prop.colorGroup].push(prop);
-                  }
-                  return acc;
-                }, {}); %>
-
-                <% Object.entries(groupedYourProps).forEach(([colorGroup, props]) => { %>
-                  <div class="property-group" data-color-group="<%= colorGroup %>">
-                    <h3 class="group-title"><%= colorGroup.charAt(0).toUpperCase() + colorGroup.slice(1) %></h3>
-                    <div class="group-properties">
-                      <% props.forEach((property) => { %>
-                        <div class="property-card" data-property-id="<%= property.id %>">
-                          <div class="color-strip" style="background-color: <%= property.colorGroup %>"></div>
-                          <div class="property-name"><%= property.name %></div>
-                          <div class="property-price">$<%= property.price %></div>
-                          <div class="property-rent">Current Rent: $<%= property.rent_levels[property.houseCount] %></div>
-                          <div class="property-stats">
-                            <% if (property.houseCount > 0) { %>
-                              <div class="house-count">Houses: <%= property.houseCount %></div>
-                            <% } %>
-                            <% if (property.hasHotel) { %>
-                              <div class="hotel-indicator">Hotel</div>
-                            <% } %>
-                            <% if (property.isMortgaged) { %>
-                              <div class="mortgaged-indicator">Mortgaged</div>
-                            <% } %>
-                          </div>
-                          <div class="property-actions">
-                            <button class="btn btn-small" onclick="handleBuildHouse(<%= property.id %>)">Build</button>
-                            <button class="btn btn-small" onclick="handleMortgage(<%= property.id %>)">
-                              <%= property.isMortgaged ? 'Unmortgage' : 'Mortgage' %>
-                            </button>
-                          </div>
-                        </div>
-                      <% }); %>
-                    </div>
-                  </div>
-                <% }); %>
-
-                <!-- Your Special Properties -->
-                <div class="special-properties">
-                  <h3>Your Railroads & Utilities</h3>
-                  <div class="group-properties">
-                    <% properties.filter(p => !p.colorGroup && p.ownerId === currentPlayerId).forEach((property) => { %>
-                      <div class="property-card <%= property.type %>" data-property-id="<%= property.id %>">
-                        <div class="property-name"><%= property.name %></div>
-                        <div class="property-price">$<%= property.price %></div>
-                        <div class="property-rent">Current Rent: $<%= property.rent_levels[0] %></div>
-                        <% if (property.isMortgaged) { %>
-                          <div class="mortgaged-indicator">Mortgaged</div>
-                        <% } %>
-                        <div class="property-actions">
-                          <button class="btn btn-small" onclick="handleMortgage(<%= property.id %>)">
-                            <%= property.isMortgaged ? 'Unmortgage' : 'Mortgage' %>
-                          </button>
-                        </div>
-                      </div>
-                    <% }); %>
-                  </div>
+            <section class="properties-section">
+                <div class="panel-header">
+                    <h2 class="panel-title">Properties</h2>
                 </div>
-              </div>
-            </div>
-
-            <div class="tab-pane" id="owned">
-              <div class="properties-list">
-                <% const otherProps = properties.filter(p => p.ownerId && p.ownerId !== currentPlayerId); %>
-                <% const groupedOtherProps = otherProps.reduce((acc, prop) => {
-                  const owner = players.find(p => p.id === prop.ownerId);
-                  const ownerName = owner ? owner.username : 'Unknown';
-                  if (!acc[ownerName]) {
-                    acc[ownerName] = [];
-                  }
-                  acc[ownerName].push(prop);
-                  return acc;
-                }, {}); %>
-
-                <% Object.entries(groupedOtherProps).forEach(([ownerName, props]) => { %>
-                  <div class="owner-group">
-                    <h3 class="owner-title"><%= ownerName %>'s Properties</h3>
-                    <div class="group-properties">
-                      <% props.forEach((property) => { %>
-                        <div class="property-card" data-property-id="<%= property.id %>">
-                          <% if (property.colorGroup) { %>
-                            <div class="color-strip" style="background-color: <%= property.colorGroup %>"></div>
-                          <% } %>
-                          <div class="property-name"><%= property.name %></div>
-                          <div class="property-price">$<%= property.price %></div>
-                          <div class="property-rent">Current Rent: $<%= property.rent_levels[property.houseCount] %></div>
-                          <div class="property-stats">
-                            <% if (property.houseCount > 0) { %>
-                              <div class="house-count">Houses: <%= property.houseCount %></div>
-                            <% } %>
-                            <% if (property.hasHotel) { %>
-                              <div class="hotel-indicator">Hotel</div>
-                            <% } %>
-                            <% if (property.isMortgaged) { %>
-                              <div class="mortgaged-indicator">Mortgaged</div>
-                            <% } %>
-                          </div>
-                        </div>
-                      <% }); %>
-                    </div>
-                  </div>
-                <% }); %>
-              </div>
-            </div>
-          </div>
+                <div class="panel-content" id="properties-list">
+                    <!-- Properties will be rendered here by the UIManager -->
+                </div>
+            </section>
         </div>
-      </section>
-    </main>
 
-    <!-- Game Messages -->
-    <div class="game-messages" aria-live="polite"></div>
-    
-    <!-- Message History -->
-    <div class="message-history" id="message-history">
-      <header class="message-history-header">
-        <h3 class="message-history-title">Game History</h3>
-        <button class="close-history" aria-label="Close history">&times;</button>
-      </header>
-      <div class="message-history-content"></div>
+        <!-- Game Messages -->
+        <div class="game-messages" id="game-messages"></div>
+
+        <!-- Message History Panel -->
+        <div class="message-history-panel hidden" id="message-history">
+            <div class="message-history-header">
+                <h3>Game History</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="message-history-content" id="message-history-content">
+                <% gameState.gameLog.forEach((event) => { %>
+                    <div class="game-event">
+                        <span class="timestamp"><%= new Date(event.timestamp).toLocaleTimeString() %></span>
+                        <span class="description"><%= event.description %></span>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <script>
-    window.monopolyGameData = {
-      gameId: <%= game.id %>,
-      currentPlayerId: <%= currentPlayerId || -1 %>,
-      gameState: <%- JSON.stringify(gameState || {}) %>,
-      players: <%- JSON.stringify(players || []) %>,
-      properties: <%- JSON.stringify(properties || []) %>
-    };
-  </script>
+    <!-- Error Container -->
+    <div id="error-container" class="error-container"></div>
 
-  <script src="/dist/game.bundle.js"></script>
-
-  <%- include('partials/footer') %>
+    <script>
+        window.GAME_ID = '<%= gameId %>';
+        window.USER_TOKEN = '<%= token %>';
+        window.monopolyGameData = {
+            gameId: <%= gameId %>,
+            currentUserId: <%= currentUserId %>,
+            currentPlayerId: <%= currentPlayerId %>,
+            token: '<%= token %>',
+            players: <%- JSON.stringify(gameState.players) %>,
+            properties: <%- JSON.stringify(gameState.properties) %>,
+            gameState: <%- JSON.stringify(gameState) %>
+        };
+    </script>
+    <script src="/dist/js/game.bundle.js" type="module"></script>
 </body>
 </html> 

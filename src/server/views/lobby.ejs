@@ -13,10 +13,10 @@
         <p class="section-description">Customize your game settings</p>
       </div>
 
-      <form action="/lobby/create" method="POST" class="create-game-form">
+      <form id="createGameForm" class="create-game-form">
         <div class="form-group">
           <label for="bot-count">Number of Bot Players</label>
-          <select name="botCount" id="bot-count" class="form-control">
+          <select name="botCount" id="bot-count" class="form-control" onchange="toggleBotOptions(this.value)">
             <option value="0">No Bots</option>
             <option value="1">1 Bot</option>
             <option value="2">2 Bots</option>
@@ -97,50 +97,51 @@
       <div class="games-list">
         <% if (games && games.length > 0) { %>
           <% games.forEach(game => { %>
-            <div class="game-card <%= game.status === 'waiting' && game.playerCount < 4 ? 'joinable' : '' %>">
+            <div class="game-card <%= game.joinable ? 'joinable' : '' %>">
               <div class="game-info">
                 <div class="game-header">
                   <h3>Game #<%= game.id %></h3>
-                  <span class="game-status <%= game.status %>">
-                    <%= game.status.charAt(0).toUpperCase() + game.status.slice(1) %>
+                  <span class="game-status <%= game.status.toLowerCase() %>">
+                    <%= game.status.charAt(0).toUpperCase() + game.status.slice(1).toLowerCase() %>
                   </span>
                 </div>
                 <div class="game-details">
                   <div class="player-count">
                     <span class="detail-icon">👥</span>
                     <span class="detail-text">
-                      <%= game.humanCount || 0 %> human<%= (game.humanCount || 0) !== 1 ? 's' : '' %>, 
-                      <%= game.botCount || 0 %> bot<%= (game.botCount || 0) !== 1 ? 's' : '' %>
+                      <%= game.human_count %> human<%= game.human_count !== 1 ? 's' : '' %>, 
+                      <%= game.bot_count %> bot<%= game.bot_count !== 1 ? 's' : '' %>
                     </span>
                   </div>
                   <div class="total-players">
                     <span class="detail-icon">🎲</span>
-                    <span class="detail-text"><%= game.playerCount || 0 %>/4 players</span>
+                    <span class="detail-text"><%= game.player_count %>/4 players</span>
                   </div>
                 </div>
                 <div class="game-actions">
-                  <% if (game.status === 'waiting' && game.playerCount < 4) { %>
-                    <form action="/lobby/join/<%= game.id %>" method="POST" class="join-form">
-                      <button type="submit" class="btn btn-secondary join-game-btn">
-                        <span class="btn-icon">➡️</span>
-                        Join Game
-                      </button>
-                    </form>
+                  <% if (game.canJoin) { %>
+                    <button onclick="joinGame(<%- game.id %>)" class="btn btn-primary join-game-btn">
+                      <span class="btn-icon">➡️</span>
+                      Join Game
+                    </button>
                   <% } %>
-                  <% if (game.ownerId === user.id) { %>
-                    <form action="/lobby/delete/<%= game.id %>" method="POST" class="delete-form">
-                      <button type="submit" class="btn btn-danger delete-game-btn">
-                        <span class="btn-icon">🗑️</span>
-                        Delete Game
-                      </button>
-                    </form>
-                  <% } else if (game.status === 'waiting') { %>
-                    <form action="/lobby/leave/<%= game.id %>" method="POST" class="leave-form">
-                      <button type="submit" class="btn btn-outline leave-game-btn">
-                        <span class="btn-icon">🚪</span>
-                        Leave Game
-                      </button>
-                    </form>
+                  <% if (game.isOwner) { %>
+                    <button onclick="deleteGame(<%- game.id %>)" class="btn btn-danger delete-game-btn">
+                      <span class="btn-icon">🗑️</span>
+                      Delete Game
+                    </button>
+                  <% } %>
+                  <% if (game.canLeave) { %>
+                    <button onclick="leaveGame(<%- game.id %>)" class="btn btn-secondary leave-game-btn">
+                      <span class="btn-icon">🚪</span>
+                      Leave Game
+                    </button>
+                  <% } %>
+                  <% if (game.isPlayerInGame && game.status === 'in-progress') { %>
+                    <a href="/game/<%- game.id %>" class="btn btn-primary play-game-btn">
+                      <span class="btn-icon">🎮</span>
+                      Play Game
+                    </a>
                   <% } %>
                 </div>
               </div>
@@ -159,9 +160,107 @@
 </div>
 
 <script>
+async function joinGame(gameId) {
+    try {
+        const response = await fetch(`/lobby/games/${gameId}/join`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            window.location.href = `/game/${gameId}/play`;
+        } else {
+            const error = await response.json();
+            alert(error.error || 'Failed to join game');
+        }
+    } catch (error) {
+        console.error('Error joining game:', error);
+        alert('Failed to join game');
+    }
+}
+
+async function leaveGame(gameId) {
+    try {
+        const response = await fetch(`/lobby/games/${gameId}/leave`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.message || 'Failed to leave game');
+        }
+    } catch (error) {
+        console.error('Error leaving game:', error);
+        alert('Failed to leave game');
+    }
+}
+
+async function deleteGame(gameId) {
+    if (!confirm('Are you sure you want to delete this game?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/lobby/games/${gameId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.message || 'Failed to delete game');
+        }
+    } catch (error) {
+        console.error('Error deleting game:', error);
+        alert('Failed to delete game');
+    }
+}
+
+document.getElementById('createGameForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = {
+        maxPlayers: 4,
+        botCount: parseInt(formData.get('botCount')),
+        botDifficulty: formData.get('botDifficulty'),
+        botStrategy: formData.get('botStrategy')
+    };
+
+    try {
+        const response = await fetch('/lobby/games', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.message || 'Failed to create game');
+        }
+    } catch (error) {
+        console.error('Error creating game:', error);
+        alert('Failed to create game');
+    }
+});
+
 function toggleBotOptions(value) {
-  const botOptions = document.getElementById('bot-options');
-  botOptions.style.display = value === '0' ? 'none' : 'block';
+    const botOptions = document.getElementById('bot-options');
+    botOptions.style.display = value === '0' ? 'none' : 'block';
 }
 </script>
 

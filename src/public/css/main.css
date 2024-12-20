@@ -1,3 +1,5 @@
+@import 'variables.css';
+
 /* Reset and base styles */
 * {
     margin: 0;
@@ -15,46 +17,71 @@ body {
     flex-direction: column;
 }
 
-/* Header styles */
+/* Main Header */
 .main-header {
-    background: #fff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    padding: 0.5rem;
+    background: var(--bg-primary);
+    box-shadow: 0 2px 4px var(--shadow-color);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    z-index: var(--z-index-header);
 }
 
 .main-nav {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
+    padding: 0 var(--spacing-md);
+    height: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
 .nav-brand a {
-    color: #333;
+    color: var(--text-primary);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
     text-decoration: none;
-    font-size: 1.5rem;
-    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.nav-brand a:hover {
+    color: var(--color-primary);
 }
 
 .nav-links {
     display: flex;
-    gap: 1.5rem;
     align-items: center;
+    gap: var(--spacing-md);
 }
 
 .nav-links a {
-    color: #666;
+    color: var(--text-secondary);
     text-decoration: none;
-    transition: color 0.2s;
+    font-weight: var(--font-weight-medium);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
 }
 
 .nav-links a:hover {
-    color: #4a90e2;
+    color: var(--color-primary);
+    background: var(--bg-secondary);
 }
 
 .user-name {
-    color: #666;
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
 }
 
 .logout-form {
@@ -64,24 +91,24 @@ body {
 .btn-link {
     background: none;
     border: none;
-    color: #666;
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 1rem;
-    padding: 0;
-    text-decoration: underline;
+    transition: all var(--transition-fast);
 }
 
 .btn-link:hover {
-    color: #4a90e2;
+    color: var(--color-primary);
+    background: var(--bg-secondary);
 }
 
-/* Main content */
+/* Main Content */
 .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 0.5rem;
-    min-height: 0;
+    padding-top: var(--header-height);
+    min-height: 100vh;
+    background: var(--bg-secondary);
 }
 
 /* Footer styles */
@@ -405,16 +432,16 @@ body {
 }
 
 /* Property Colors - Monopoly Standard Colors */
-.property-item.color-brown { background: linear-gradient(to right, #955436 0%, #955436 4px, #f5f5f5 4px, #f5f5f5 100%); }
-.property-item.color-light-blue { background: linear-gradient(to right, #AAE0FA 0%, #AAE0FA 4px, #f5f5f5 4px, #f5f5f5 100%); }
-.property-item.color-pink { background: linear-gradient(to right, #D93A96 0%, #D93A96 4px, #f5f5f5 4px, #f5f5f5 100%); }
-.property-item.color-orange { background: linear-gradient(to right, #F7941D 0%, #F7941D 4px, #f5f5f5 4px, #f5f5f5 100%); }
-.property-item.color-red { background: linear-gradient(to right, #ED1B24 0%, #ED1B24 4px, #f5f5f5 4px, #f5f5f5 100%); }
-.property-item.color-yellow { background: linear-gradient(to right, #FEF200 0%, #FEF200 4px, #f5f5f5 4px, #f5f5f5 100%); }
-.property-item.color-green { background: linear-gradient(to right, #1FB25A 0%, #1FB25A 4px, #f5f5f5 4px, #f5f5f5 100%); }
-.property-item.color-blue { background: linear-gradient(to right, #0072BB 0%, #0072BB 4px, #f5f5f5 4px, #f5f5f5 100%); }
-.property-item.color-railroad { background: linear-gradient(to right, #000000 0%, #000000 4px, #f5f5f5 4px, #f5f5f5 100%); }
-.property-item.color-utility { background: linear-gradient(to right, #808080 0%, #808080 4px, #f5f5f5 4px, #f5f5f5 100%); }
+.property-item.color-brown { background: linear-gradient(to right, var(--color-brown) 0%, var(--color-brown) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
+.property-item.color-light-blue { background: linear-gradient(to right, var(--color-lightblue) 0%, var(--color-lightblue) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
+.property-item.color-pink { background: linear-gradient(to right, var(--color-pink) 0%, var(--color-pink) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
+.property-item.color-orange { background: linear-gradient(to right, var(--color-orange) 0%, var(--color-orange) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
+.property-item.color-red { background: linear-gradient(to right, var(--color-red) 0%, var(--color-red) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
+.property-item.color-yellow { background: linear-gradient(to right, var(--color-yellow) 0%, var(--color-yellow) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
+.property-item.color-green { background: linear-gradient(to right, var(--color-green) 0%, var(--color-green) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
+.property-item.color-blue { background: linear-gradient(to right, var(--color-blue) 0%, var(--color-blue) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
+.property-item.color-railroad { background: linear-gradient(to right, var(--color-railroad) 0%, var(--color-railroad) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
+.property-item.color-utility { background: linear-gradient(to right, var(--color-utility) 0%, var(--color-utility) 4px, var(--bg-secondary) 4px, var(--bg-secondary) 100%); }
 
 /* Property Item Hover Effect */
 .property-item:hover {
@@ -422,16 +449,16 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.property-item.color-brown:hover { background: linear-gradient(to right, #955436 0%, #955436 4px, #eee 4px, #eee 100%); }
-.property-item.color-light-blue:hover { background: linear-gradient(to right, #AAE0FA 0%, #AAE0FA 4px, #eee 4px, #eee 100%); }
-.property-item.color-pink:hover { background: linear-gradient(to right, #D93A96 0%, #D93A96 4px, #eee 4px, #eee 100%); }
-.property-item.color-orange:hover { background: linear-gradient(to right, #F7941D 0%, #F7941D 4px, #eee 4px, #eee 100%); }
-.property-item.color-red:hover { background: linear-gradient(to right, #ED1B24 0%, #ED1B24 4px, #eee 4px, #eee 100%); }
-.property-item.color-yellow:hover { background: linear-gradient(to right, #FEF200 0%, #FEF200 4px, #eee 4px, #eee 100%); }
-.property-item.color-green:hover { background: linear-gradient(to right, #1FB25A 0%, #1FB25A 4px, #eee 4px, #eee 100%); }
-.property-item.color-blue:hover { background: linear-gradient(to right, #0072BB 0%, #0072BB 4px, #eee 4px, #eee 100%); }
-.property-item.color-railroad:hover { background: linear-gradient(to right, #000000 0%, #000000 4px, #eee 4px, #eee 100%); }
-.property-item.color-utility:hover { background: linear-gradient(to right, #808080 0%, #808080 4px, #eee 4px, #eee 100%); }
+.property-item.color-brown:hover { background: linear-gradient(to right, var(--color-brown) 0%, var(--color-brown) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
+.property-item.color-light-blue:hover { background: linear-gradient(to right, var(--color-lightblue) 0%, var(--color-lightblue) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
+.property-item.color-pink:hover { background: linear-gradient(to right, var(--color-pink) 0%, var(--color-pink) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
+.property-item.color-orange:hover { background: linear-gradient(to right, var(--color-orange) 0%, var(--color-orange) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
+.property-item.color-red:hover { background: linear-gradient(to right, var(--color-red) 0%, var(--color-red) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
+.property-item.color-yellow:hover { background: linear-gradient(to right, var(--color-yellow) 0%, var(--color-yellow) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
+.property-item.color-green:hover { background: linear-gradient(to right, var(--color-green) 0%, var(--color-green) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
+.property-item.color-blue:hover { background: linear-gradient(to right, var(--color-blue) 0%, var(--color-blue) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
+.property-item.color-railroad:hover { background: linear-gradient(to right, var(--color-railroad) 0%, var(--color-railroad) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
+.property-item.color-utility:hover { background: linear-gradient(to right, var(--color-utility) 0%, var(--color-utility) 4px, var(--bg-tertiary) 4px, var(--bg-tertiary) 100%); }
 
 .property-item .property-name {
   font-weight: 500;
@@ -718,4 +745,104 @@ body {
 #game-status:hover {
   background: #e0e0e0;
 }
+
+/* Game status */
+.game-status {
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 300px;
+  justify-content: center;
+  position: relative;
+}
+
+.game-status:hover {
+  background: var(--bg-tertiary);
+  transform: translateY(-1px);
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--bg-primary);
+}
+
+.btn-primary:hover {
+  background: var(--color-primary);
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: var(--color-secondary);
+  color: var(--bg-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--color-secondary);
+  opacity: 0.9;
+}
+
+/* Player controls */
+#roll-dice {
+  background-color: var(--color-success);
+  color: var(--bg-primary);
+}
+
+#end-turn {
+  background-color: var(--color-info);
+  color: var(--bg-primary);
+}
+
+#show-rules {
+  background-color: var(--color-primary);
+  color: var(--bg-primary);
+}
+
+/* Player panel */
+.player-panel {
+  margin-bottom: 10px;
+  padding: 10px;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  border-left: 4px solid var(--color-border);
+}
+
+.player-panel.current-player {
+  border-left-color: var(--color-success);
+}
+
+.player-panel.active-turn {
+  background-color: var(--bg-tertiary);
+}
+
+/* Property cards */
+.property-card {
+  margin-bottom: 10px;
+  padding: 10px;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  border-left: 4px solid;
+}
+
+/* Property card colors */
+.property-card.brown { border-left-color: var(--color-brown); }
+.property-card.light-blue { border-left-color: var(--color-lightblue); }
+.property-card.pink { border-left-color: var(--color-pink); }
+.property-card.orange { border-left-color: var(--color-orange); }
+.property-card.red { border-left-color: var(--color-red); }
+.property-card.yellow { border-left-color: var(--color-yellow); }
+.property-card.green { border-left-color: var(--color-green); }
+.property-card.blue { border-left-color: var(--color-blue); }
+.property-card.railroad { border-left-color: var(--color-railroad); }
+.property-card.utility { border-left-color: var(--color-utility); }
  

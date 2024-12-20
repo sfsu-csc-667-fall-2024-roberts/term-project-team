@@ -7,6 +7,7 @@ module.exports = {
     game: './src/public/js/game.ts',
     lobby: './src/public/js/lobby.ts',
     styles: [
+      './src/public/css/variables.css',
       './src/public/css/main.css',
       './src/public/css/auth.css',
       './src/public/css/lobby.css',
@@ -17,32 +18,55 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.tsx?$/,
+        test: /\.ts$/,
         use: 'ts-loader',
         exclude: /node_modules/,
       },
       {
         test: /\.css$/,
         use: [
-          MiniCssExtractPlugin.loader,
-          'css-loader'
+          {
+            loader: MiniCssExtractPlugin.loader,
+            options: {
+              publicPath: '/dist/'
+            }
+          },
+          {
+            loader: 'css-loader',
+            options: {
+              url: false,
+              import: true
+            }
+          }
         ]
       }
     ],
   },
   plugins: [
     new MiniCssExtractPlugin({
-      filename: '[name].css'
+      filename: 'css/[name].css'
     })
   ],
   resolve: {
-    extensions: ['.tsx', '.ts', '.js', '.css'],
+    extensions: ['.ts', '.js'],
     alias: {
       '@shared': path.resolve(__dirname, 'src/shared')
     }
   },
   output: {
-    filename: '[name].bundle.js',
-    path: path.resolve(__dirname, 'public/dist'),
+    filename: 'js/[name].bundle.js',
+    path: path.resolve(__dirname, 'dist'),
+    clean: true,
+    publicPath: '/dist/'
   },
+  stats: {
+    colors: true,
+    modules: true,
+    reasons: true,
+    errorDetails: true
+  },
+  devtool: 'source-map',
+  infrastructureLogging: {
+    level: 'info'
+  }
 }; 

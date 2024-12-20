@@ -1,0 +1,103 @@
+:root {
+  /* Colors */
+  --color-primary: #007bff;
+  --color-primary-dark: #0056b3;
+  --color-secondary: #6c757d;
+  --color-secondary-dark: #495057;
+  --color-success: #28a745;
+  --color-success-dark: #1e7e34;
+  --color-danger: #dc3545;
+  --color-danger-dark: #bd2130;
+  --color-warning: #ffc107;
+  --color-warning-dark: #d39e00;
+  --color-info: #17a2b8;
+  --color-info-dark: #117a8b;
+  --color-light: #f8f9fa;
+  --color-dark: #343a40;
+  --color-border: #dee2e6;
+
+  /* Player Colors */
+  --player-color-0: #E53935;  /* Red */
+  --player-color-1: #43A047;  /* Green */
+  --player-color-2: #1E88E5;  /* Blue */
+  --player-color-3: #FDD835;  /* Yellow */
+  --player-color-4: #8E24AA;  /* Purple */
+  --player-color-5: #00ACC1;  /* Cyan */
+  --player-color-6: #FB8C00;  /* Orange */
+  --player-color-7: #6D4C41;  /* Brown */
+
+  /* Property Colors */
+  --color-brown: #955436;
+  --color-lightblue: #AAE0FA;
+  --color-pink: #D93A96;
+  --color-orange: #F7941D;
+  --color-red: #ED1B24;
+  --color-yellow: #FEF200;
+  --color-green: #1FB25A;
+  --color-blue: #0072BB;
+  --color-railroad: #000000;
+  --color-utility: #808080;
+
+  /* Background colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --bg-warning: #fff3cd;
+  --bg-info: #cce5ff;
+  --bg-success: #d4edda;
+  --bg-railroad: #000000;
+  --bg-utility: #808080;
+
+  /* Text colors */
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-light: #f8f9fa;
+  --text-warning: #856404;
+  --text-info: #004085;
+  --text-success: #155724;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* Border radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 1rem;
+
+  /* Font sizes */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+
+  /* Font weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease-in-out;
+  --transition-normal: 0.3s ease-in-out;
+
+  /* Shadows */
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-color-dark: rgba(0, 0, 0, 0.2);
+
+  /* Z-index layers */
+  --z-index-base: 1;
+  --z-index-board: 10;
+  --z-index-dice: 20;
+  --z-index-messages: 30;
+  --z-index-modal: 40;
+  --z-index-header: 50;
+
+  /* Layout */
+  --header-height: 4rem;
+  --footer-height: 3rem;
+  --sidebar-width: 300px;
+} 

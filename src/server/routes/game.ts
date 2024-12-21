@@ -340,4 +340,25 @@ router.put('/game/:gameId/properties/:propertyId/rent', requireAuth, async (req:
   }
 });
 
+// POST /game/:id/end-turn - Reload page after ending a turn
+router.post('/game/:id/end-turn', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const roomId = req.body.roomId;
+    const playerId = req.body.playerId;
+    const gameState = req.body.gameState;
+
+    console.log("Attempting to end turn-RELOAD page " + roomId + " called by playerId: " + playerId);
+
+    req.app.get("io").to(`testroom`).emit(`reload:${roomId}`, {
+      sender: playerId, 
+      gameState: gameState,
+    });
+
+    res.status(200).send();
+  } catch (error) {
+    console.error('End turn/reload:', error);
+    res.status(500).json({ error: 'Failed to end turn/reload page' });
+  }
+});
+
 export default router; 

@@ -1,5 +1,6 @@
 import { GameData, Player, Property, GameState } from './types';
 import MonopolyBoard from './board';
+import express from "express";
 
 interface RollResponse {
   roll: number;
@@ -174,7 +175,7 @@ interface BotActionResponse {
 
       // End turn
       await new Promise(resolve => setTimeout(resolve, 1000));
-      await this.endBotTurn(bot);
+      await this.endTurn();
     } finally {
       this.isProcessingBotTurn = false;
     }
@@ -317,7 +318,7 @@ interface BotActionResponse {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ playerId: this.gameData.currentPlayerId })
+        body: JSON.stringify({ playerId: this.gameData.currentPlayerId , roomId: this.gameData.gameId, gameState: this.gameData.gameState})
       });
 
       if (!response.ok) {
@@ -326,9 +327,9 @@ interface BotActionResponse {
         return;
       }
 
-      const data = await response.json();
+      /*const data = await response.json();
       this.gameData.gameState = data.gameState;
-      this.updateBoard();
+      this.updateBoard();*/
 
       // Process next bot if it's their turn
       const nextPlayer = this.getNextPlayer();
@@ -340,7 +341,22 @@ interface BotActionResponse {
       GameService.showMessage('Failed to end turn');
     }
   }
+
 }
+
+//Listen for board updates
+window.socket.on(
+  `reload:${window.gameData.gameId}`,
+  ({
+    sender,
+    gameState,
+  }: {
+    sender: string;
+    gameState: GameState;
+  }) => {
+    window.location.reload();
+  },
+);
 
 // Initialize game service when the page loads
 document.addEventListener('DOMContentLoaded', () => {

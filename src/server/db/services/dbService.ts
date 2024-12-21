@@ -274,7 +274,7 @@ export async function buyProperty(gameId: number, position: number, playerId: nu
     // Check if property already exists
     let property = await getPropertyByPosition(gameId, position);
     
-    if (property) {
+    if (property?.owner_id != null) {
       throw new Error('Property already owned');
     }
 

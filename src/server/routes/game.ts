@@ -259,6 +259,56 @@ router.post('/game/:id/bot/:botId/action', requireAuth, async (req: Request, res
   }
 });
 
+// POST /game/:id/properties/:position/buy - Buy a property
+router.post('/game/:id/properties/:position/buy', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const gameId = parseInt(req.params.id);
+    const position = parseInt(req.params.position);
+
+    if (isNaN(gameId) || isNaN(position)) {
+      res.status(400).json({ error: 'Invalid parameters' });
+      return;
+    }
+
+    const [game, players] = await Promise.all([
+      getGame(gameId),
+      getGamePlayers(gameId)
+    ]);
+
+    if (!game) {
+      res.status(404).json({ error: 'Game not found' });
+      return;
+    }
+
+    // Find the current player
+    const currentPlayer = players.find(p => p.user_id === req.session.userId);
+    if (!currentPlayer) {
+      res.status(403).json({ error: 'Not a player in this game' });
+      return;
+    }
+
+    // Check if property is already owned
+    const existingProperty = await getPropertyByPosition(gameId, position);
+    if (existingProperty?.owner_id != null) {
+      res.status(400).json({ error: 'Property already owned' });
+      return;
+    }
+
+    // Buy the property
+    const property = await buyProperty(gameId, position, currentPlayer.id);
+    
+    // Return the updated property and player data
+    res.json({
+      success: true,
+      property,
+      playerBalance: currentPlayer.balance
+    });
+  } catch (error) {
+    console.error('Property purchase error:', error);
+    res.status(500).json({ error: 'Failed to purchase property' });
+  }
+});
+
 // PUT /game/:gameId/properties/:propertyId/rent - Pay rent for a property
 router.put('/game/:gameId/properties/:propertyId/rent', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {

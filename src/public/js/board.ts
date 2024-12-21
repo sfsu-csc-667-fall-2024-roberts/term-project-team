@@ -186,20 +186,26 @@ class MonopolyBoard {
     }
   }
 
-  public async showBuyOption(player: Player, cb: () => void): Promise<void> {
+  public async showBuyOption(player: Player, roll: number, cb: () => void): Promise<void> {
     const position = player.position;
     const ownedProperty = this.propertyOwnership.get(position);
     const property = BOARD_SPACES[position];
     if (ownedProperty !== undefined) {
       if (ownedProperty !== player.id) {
         const response = await fetch(`/game/${window.gameData.gameId}/properties/${position}/rent`, {
-          method: 'PUT'
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            dice_roll: roll,
+          }),
         });
         const data = await response.json();
         GameService.showMessage(`You paid ${window.gameData.players.find(player => player.id === ownedProperty)!.username} $${data.rentAmount} to rent ${property.name}`);
       }
       cb();
-    } else if (property.price && player.balance >= property.price) {
+    } else if (['property', 'railroad', 'utility'].includes(property.type) && property.price && player.balance >= property.price) {
       this.promptBuying = true;
 
       const container = document.createElement('div');

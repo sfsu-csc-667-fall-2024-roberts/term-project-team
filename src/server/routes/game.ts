@@ -230,7 +230,7 @@ router.post('/game/:id/bot/:botId/action', requireAuth, async (req: Request, res
       case 'pay_rent':
         if (decision.property) {
           try {
-            await payRent(gameId, botId, decision.property.position);
+            await payRent(gameId, botId, decision.property.position, 1); // FIXME: get bot dice roll
             message = `paid rent for ${decision.property.name}`;
           } catch (error) {
             success = false;
@@ -315,6 +315,7 @@ router.put('/game/:gameId/properties/:propertyId/rent', requireAuth, async (req:
     const gameId = parseInt(req.params.gameId);
     const propertyId = parseInt(req.params.propertyId);
     const userId = req.session.userId!;
+    const body = req.body;
 
     // Get current player
     const players = await getGamePlayers(gameId);
@@ -325,7 +326,7 @@ router.put('/game/:gameId/properties/:propertyId/rent', requireAuth, async (req:
     }
 
     // Pay rent and get updated balances
-    const { tenantBalance, ownerBalance, rentAmount } = await payRent(gameId, currentPlayer.id, propertyId);
+    const { tenantBalance, ownerBalance, rentAmount } = await payRent(gameId, currentPlayer.id, propertyId, body.dice_roll);
 
     res.json({
       success: true,

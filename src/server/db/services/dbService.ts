@@ -591,7 +591,7 @@ export async function getGameById(gameId: number): Promise<Game | null> {
   return result.rows[0] || null;
 }
 
-export async function payRent(gameId: number, playerId: number, propertyPosition: number): Promise<{
+export async function payRent(gameId: number, playerId: number, propertyPosition: number, diceRole: number): Promise<{
   tenantBalance: number;
   ownerBalance: number;
   rentAmount: number
@@ -613,7 +613,7 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
 
     // Get the property details from board data
     const boardSpace = BOARD_SPACES[propertyPosition];
-    if (!boardSpace || boardSpace.type !== 'property' || typeof boardSpace.rent !== 'object') {
+    if (!boardSpace || !['property', 'railroad', 'utility'].includes(boardSpace.type)) {
       throw new Error('Invalid property position');
     }
 
@@ -631,7 +631,12 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
     }
 
     // Calculate rent based on property state
-    const rentAmount: number = boardSpace.rent[Math.min(property.house_count, boardSpace.rent.length - 1)];
+    let rentAmount: number
+    if (typeof boardSpace.rent === 'object') {
+      rentAmount = boardSpace.rent[Math.min(property.house_count, boardSpace.rent.length - 1)];
+    } else {
+      rentAmount = 4 * diceRole; // TODO: use 4 or 10 depending if both utilities is owned by the same player
+    }
 
     // Check if player can afford rent
     if (player.balance < rentAmount) {

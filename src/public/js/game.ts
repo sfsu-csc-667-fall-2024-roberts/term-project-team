@@ -127,7 +127,7 @@ interface BotActionResponse {
       await this.updatePlayerPosition(player, data.newPosition);
       this.gameData.gameState = data.gameState;
 
-      this.board.showBuyOption(player, async () => {
+      this.board.showBuyOption(player, data.roll, async () => {
         // Update UI
         this.updateTurnUI();
         

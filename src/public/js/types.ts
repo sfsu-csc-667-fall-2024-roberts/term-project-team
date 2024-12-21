@@ -1,4 +1,5 @@
 import { GameState as SharedGameState } from '../../shared/types';
+import { io, Socket } from "socket.io-client";
 
 export type GameState = SharedGameState;
 
@@ -45,6 +46,8 @@ export interface ApiError {
 declare global {
   interface Window {
     gameData: GameData;
+    socket: Socket;
+    roomId: number;
   }
 }
  

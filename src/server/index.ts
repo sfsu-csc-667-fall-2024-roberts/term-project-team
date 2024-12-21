@@ -11,10 +11,14 @@ import * as routes from "./routes";
 import authRoutes from "./routes/auth";
 import lobbyRoutes from "./routes/lobby";
 import gameRoutes from "./routes/game";
+import chatRoutes from "./routes/chat";
+import * as configuration from "./config";
+import { createServer } from "http";
 
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // View engine setup
@@ -45,6 +49,12 @@ app.use(
       sameSite: 'lax'
     }
   })
+);
+
+configuration.configureSocketIO(
+  server,
+  app,
+  configuration.configureSession(app)!,
 );
 
 // Add user data to response locals
@@ -118,6 +128,7 @@ app.use("/", authRoutes);
 app.use("/", lobbyRoutes);
 app.use("/", gameRoutes);
 app.use("/tests", routes.tests);
+app.use("/chat", chatRoutes);
 
 // 404 handler
 app.use((_request, _response, next) => next(httpErrors(404)));
@@ -130,6 +141,6 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
   res.render("error");
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

@@ -1,4 +1,6 @@
 import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
+import { CHANCE_CARDS } from '../../shared/chanceData';
+import { CHEST_CARDS } from '../../shared/chestData';
 import { GameService } from './game';
 import { ApiError, Player, Property, PurchaseResponse } from './types';
 
@@ -190,7 +192,38 @@ class MonopolyBoard {
     const position = player.position;
     const ownedProperty = this.propertyOwnership.get(position);
     const property = BOARD_SPACES[position];
-    if (ownedProperty !== undefined) {
+    if (['chance', 'chest'].includes(property.type)) {
+      this.promptBuying = true;
+
+      const container = document.createElement('div');
+      container.className = `board-center-prompt board-center-${property.type}`;
+
+      const data = property.type === 'chance'
+      ? CHANCE_CARDS[Math.floor(Math.random() * CHANCE_CARDS.length)]
+      : CHEST_CARDS[Math.floor(Math.random() * CHEST_CARDS.length)];
+      const element = document.createElement('div');
+      element.innerHTML = `
+        <p>${data.title}</p>
+        <p>${data.description}</p>
+      `;
+      container.appendChild(element);
+
+      const buttons = document.createElement('div');
+      buttons.className = 'board-center-options';
+      const okay = document.createElement('button');
+      okay.className = 'btn btn-secondary';
+      okay.innerText = 'Okay'
+      buttons.appendChild(okay);
+      container.appendChild(buttons);
+
+      okay.addEventListener('click', () => {
+        this.promptBuying = false;
+        this.resetCenter();
+        cb();
+      });
+
+      this.setCenter(container);
+    } else if (ownedProperty !== undefined) {
       if (ownedProperty !== player.id) {
         const response = await fetch(`/game/${window.gameData.gameId}/properties/${position}/rent`, {
           method: 'PUT',

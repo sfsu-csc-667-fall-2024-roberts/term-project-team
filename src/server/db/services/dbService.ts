@@ -591,7 +591,11 @@ export async function getGameById(gameId: number): Promise<Game | null> {
   return result.rows[0] || null;
 }
 
-export async function payRent(gameId: number, playerId: number, propertyPosition: number): Promise<{ tenantBalance: number; ownerBalance: number }> {
+export async function payRent(gameId: number, playerId: number, propertyPosition: number): Promise<{
+  tenantBalance: number;
+  ownerBalance: number;
+  rentAmount: number
+}> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -650,7 +654,7 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
     ]);
 
     await client.query('COMMIT');
-    return { tenantBalance: newTenantBalance, ownerBalance: newOwnerBalance };
+    return { tenantBalance: newTenantBalance, ownerBalance: newOwnerBalance, rentAmount: rentAmount };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

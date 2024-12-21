@@ -186,15 +186,18 @@ class MonopolyBoard {
     }
   }
 
-  public showBuyOption(player: Player, cb: () => void): void {
+  public async showBuyOption(player: Player, cb: () => void): Promise<void> {
     const position = player.position;
     const ownedProperty = this.propertyOwnership.get(position);
     const property = BOARD_SPACES[position];
     if (ownedProperty !== undefined) {
-      fetch(`/game/${window.gameData.gameId}/properties/${position}/rent`, {
-        method: 'PUT'
-      });
-      GameService.showMessage("Paid rent");
+      if (ownedProperty !== player.id) {
+        const response = await fetch(`/game/${window.gameData.gameId}/properties/${position}/rent`, {
+          method: 'PUT'
+        });
+        const data = await response.json();
+        GameService.showMessage(`You paid ${window.gameData.players.find(player => player.id === ownedProperty)!.username} $${data.rentAmount} to rent ${property.name}`);
+      }
       cb();
     } else if (property.price && player.balance >= property.price) {
       this.promptBuying = true;

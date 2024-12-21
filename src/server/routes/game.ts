@@ -325,12 +325,13 @@ router.put('/game/:gameId/properties/:propertyId/rent', requireAuth, async (req:
     }
 
     // Pay rent and get updated balances
-    const { tenantBalance, ownerBalance } = await payRent(gameId, currentPlayer.id, propertyId);
+    const { tenantBalance, ownerBalance, rentAmount } = await payRent(gameId, currentPlayer.id, propertyId);
 
-    res.json({ 
+    res.json({
       success: true,
       tenantBalance,
-      ownerBalance
+      ownerBalance,
+      rentAmount
     });
   } catch (error) {
     console.error('Rent payment error:', error);

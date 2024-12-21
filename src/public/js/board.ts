@@ -222,7 +222,6 @@ class MonopolyBoard {
       buttons.appendChild(skip)
       container.appendChild(buttons);
   
-      // FIXME: Not working at the moment
       buy.addEventListener('click', async () => {
         try {
           const response = await fetch(`/game/${window.gameData.gameId}/properties/${position}/buy`, {
@@ -245,7 +244,8 @@ class MonopolyBoard {
           player.balance = purchaseData.playerBalance;
 
           // Update property ownership display
-          this.updatePropertyOwnership(purchaseData.property, player.id);
+          const ownerIndex = window.gameData.players.findIndex((p: Player) => p.id === player.id);
+          this.updatePropertyOwnership(purchaseData.property, ownerIndex);
         } catch (error) {
           console.error('Purchase error:', error);
         } finally {

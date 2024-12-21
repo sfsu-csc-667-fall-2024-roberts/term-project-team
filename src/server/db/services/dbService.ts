@@ -267,7 +267,7 @@ export async function buyProperty(gameId: number, position: number, playerId: nu
 
     // Get the property details from board data
     const propertyData = BOARD_SPACES.find((space: BoardSpace) => space.position === position);
-    if (!propertyData || propertyData.type !== 'property' || !propertyData.price) {
+    if (!propertyData || !['property', 'railroad', 'utility'].includes(propertyData.type) || !propertyData.price) {
       throw new Error('Invalid property position or not a purchasable property');
     }
 

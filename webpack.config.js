@@ -10,7 +10,8 @@ module.exports = {
       './src/public/css/auth.css',
       './src/public/css/lobby.css',
       './src/public/css/game.css',
-      './src/public/css/board.css'
+      './src/public/css/board.css',
+      './src/public/css/chat.css'
     ]
   },
   module: {

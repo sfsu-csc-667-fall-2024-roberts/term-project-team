@@ -14,15 +14,15 @@ interface BotActionResponse {
   gameState: GameState;
 }
 
-class GameService {
+ export class GameService {
   private gameData: GameData;
-  private messageContainer: HTMLElement;
+  private static messageContainer: HTMLElement;
   private board: MonopolyBoard;
   private isProcessingBotTurn: boolean = false;
 
   constructor(gameData: GameData) {
     this.gameData = gameData;
-    this.messageContainer = document.querySelector('.game-messages') as HTMLElement;
+    GameService.messageContainer = document.querySelector('.game-messages') as HTMLElement;
     this.board = new MonopolyBoard('monopoly-board');
     this.initializeEventListeners();
     this.initializeBoard();
@@ -72,14 +72,14 @@ class GameService {
 
       if (!response.ok) {
         const error = await response.json();
-        this.showMessage(error.error || 'Failed to roll dice');
+        GameService.showMessage(error.error || 'Failed to roll dice');
         return;
       }
 
       const data: RollResponse = await response.json();
       
       // Show roll result
-      this.showMessage(`You rolled a ${data.roll}!`);
+      GameService.showMessage(`You rolled a ${data.roll}!`);
 
       if (data.gameState.phase === 'waiting') {
         await this.handleInitialRollPhase(data);
@@ -88,12 +88,12 @@ class GameService {
       }
     } catch (error) {
       console.error('Roll error:', error);
-      this.showMessage('Failed to roll dice');
+      GameService.showMessage('Failed to roll dice');
     }
   }
 
   private async handleInitialRollPhase(data: RollResponse): Promise<void> {
-    this.showMessage(`Initial roll for turn order: ${data.roll}`);
+    GameService.showMessage(`Initial roll for turn order: ${data.roll}`);
     
     // Hide bot rolls until human player rolls
     const currentPlayer = this.gameData.players.find((p: Player) => p.user_id === this.gameData.currentUserId);
@@ -155,7 +155,7 @@ class GameService {
     
     const nextPlayer = this.getNextPlayer();
     if (nextPlayer) {
-      this.showMessage(`It's ${nextPlayer.username}'s turn`);
+      GameService.showMessage(`It's ${nextPlayer.username}'s turn`);
     }
   }
 
@@ -192,7 +192,7 @@ class GameService {
       }
 
       const data: BotActionResponse = await response.json();
-      this.showMessage(`${bot.username} ${data.message}`);
+      GameService.showMessage(`${bot.username} ${data.message}`);
       
       if (data.gameState) {
         this.gameData.gameState = data.gameState;
@@ -200,7 +200,7 @@ class GameService {
       }
     } catch (error) {
       console.error('Bot decision error:', error);
-      this.showMessage(`${bot.username} encountered an error`);
+      GameService.showMessage(`${bot.username} encountered an error`);
     }
   }
 
@@ -242,13 +242,13 @@ class GameService {
 
       if (!response.ok) {
         const error = await response.json();
-        this.showMessage(error.error || 'Failed to roll for bot');
+        GameService.showMessage(error.error || 'Failed to roll for bot');
         return;
       }
 
       const data: RollResponse = await response.json();
       const bot = this.gameData.players.find((p: Player) => p.id === botId);
-      this.showMessage(`${bot?.username || 'Bot'} rolled a ${data.roll}!`);
+      GameService.showMessage(`${bot?.username || 'Bot'} rolled a ${data.roll}!`);
 
       if (data.gameState.phase === 'playing' && typeof data.newPosition === 'number') {
         const playerIndex = this.gameData.players.findIndex((p: Player) => p.id === botId);
@@ -256,11 +256,11 @@ class GameService {
       }
     } catch (error) {
       console.error('Bot roll error:', error);
-      this.showMessage('Failed to roll for bot');
+      GameService.showMessage('Failed to roll for bot');
     }
   }
 
-  private showMessage(message: string): void {
+  public static showMessage(message: string): void {
     const messageElement = document.createElement('div');
     messageElement.className = 'game-message';
     messageElement.textContent = message;
@@ -277,7 +277,7 @@ class GameService {
       .filter(Boolean)
       .join(' → ');
     
-    this.showMessage(`Turn order: ${turnOrder}`);
+    GameService.showMessage(`Turn order: ${turnOrder}`);
   }
 
   private getNextPlayer(): Player | undefined {
@@ -322,7 +322,7 @@ class GameService {
 
       if (!response.ok) {
         const error = await response.json();
-        this.showMessage(error.error || 'Failed to end turn');
+        GameService.showMessage(error.error || 'Failed to end turn');
         return;
       }
 
@@ -337,7 +337,7 @@ class GameService {
       }
     } catch (error) {
       console.error('End turn error:', error);
-      this.showMessage('Failed to end turn');
+      GameService.showMessage('Failed to end turn');
     }
   }
 }

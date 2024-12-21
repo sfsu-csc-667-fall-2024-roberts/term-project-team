@@ -603,7 +603,7 @@ export async function payRent(gameId: number, playerId: number, propertyPosition
     );
     const property = propertyResult.rows[0];
 
-    if (!property || !property.owner_id) {
+    if (!property || property.owner_id == null) {
       throw new Error('Property not found or has no owner');
     }
 

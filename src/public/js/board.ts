@@ -1,4 +1,5 @@
 import { BOARD_SPACES, BoardSpace } from '../../shared/boardData';
+import { GameService } from './game';
 import { ApiError, Player, Property, PurchaseResponse } from './types';
 
 class MonopolyBoard {
@@ -190,7 +191,10 @@ class MonopolyBoard {
     const ownedProperty = this.propertyOwnership.get(position);
     const property = BOARD_SPACES[position];
     if (ownedProperty !== undefined) {
-      // TODO: Implement rent logic
+      fetch(`/game/${window.gameData.gameId}/properties/${position}/rent`, {
+        method: 'PUT'
+      });
+      GameService.showMessage("Paid rent");
       cb();
     } else if (property.price && player.balance >= property.price) {
       this.promptBuying = true;
@@ -225,10 +229,7 @@ class MonopolyBoard {
       buy.addEventListener('click', async () => {
         try {
           const response = await fetch(`/game/${window.gameData.gameId}/properties/${position}/buy`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            }
+            method: 'POST'
           });
 
           const data = await response.json();

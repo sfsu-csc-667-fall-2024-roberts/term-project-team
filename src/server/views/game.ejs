@@ -25,18 +25,21 @@
             return a.is_bot ? 1 : -1;
           });
         %>
-        <% sortedPlayers.forEach(player => { %>
+        <% sortedPlayers.forEach((player, index) => { %>
           <div class="player-card <%= player.id === currentPlayerId ? 'current-player' : '' %> <%= player.is_bot ? 'bot-player' : '' %>">
             <div class="player-info">
-              <h3>
-                <%= player.username %> 
-                <% if (player.id === currentPlayerId) { %>
-                  (You)
-                <% } %>
-                <% if (player.is_bot) { %>
-                  <span class="bot-badge" title="Bot Strategy: <%= player.bot_strategy || 'balanced' %>, Difficulty: <%= player.bot_difficulty || 'medium' %>">🤖</span>
-                <% } %>
-              </h3>
+              <div class="player-name">
+                <h3>
+                  <%= player.username %>
+                  <% if (player.id === currentPlayerId) { %>
+                    (You)
+                  <% } %>
+                  <% if (player.is_bot) { %>
+                    <span class="bot-badge" title="Bot Strategy: <%= player.bot_strategy || 'balanced' %>, Difficulty: <%= player.bot_difficulty || 'medium' %>">🤖</span>
+                  <% } %>
+                </h3>
+                <div class="player-token player-<%= index %>" style="position:relative"></div>
+              </div>
               <p class="balance">Balance: $<%= player.balance %></p>
               <p class="position">Position: <%= player.position %></p>
               <% if (gameState.phase === 'waiting') { %>

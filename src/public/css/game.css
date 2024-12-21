@@ -134,7 +134,12 @@
   background: #f0f7ff;
 }
 
-.player-info h3 {
+.player-name {
+  display: flex;
+  justify-content: space-between;
+}
+
+.player-name h3 {
   margin: 0 0 0.5rem 0;
   font-size: 1rem;
   display: flex;
